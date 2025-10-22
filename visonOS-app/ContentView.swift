@@ -11,8 +11,13 @@ struct ContentView: View {
                 // Sau khi đăng nhập thì vào màn 3D
                 ImmersiveView()
             } else {
-                // Nếu chưa đăng nhập thì vào login
-                LoginView()
+                // Hiển thị Login hoặc Signup dựa trên currentAuthState
+                switch appModel.currentAuthState {
+                case .login:
+                    LoginView()
+                case .signup:
+                    SignUpView()
+                }
             }
         }
     }

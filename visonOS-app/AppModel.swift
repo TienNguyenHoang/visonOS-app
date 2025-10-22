@@ -18,8 +18,14 @@ class AppModel {
         case inTransition
         case open
     }
+    
+    enum AuthState {
+        case login
+        case signup
+    }
 
     var immersiveSpaceState = ImmersiveSpaceState.closed
     var isLoggedIn: Bool = false
     var userEmail: String = ""
+    var currentAuthState: AuthState = .login
 }

@@ -14,8 +14,7 @@ struct visonOS_appApp: App {
 
     var body: some Scene {
         WindowGroup {
-            LoginView()
-                .environment(appModel)
+            RootView()
         }
 
         ImmersiveSpace(id: appModel.immersiveSpaceID) {

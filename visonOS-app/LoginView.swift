@@ -21,7 +21,7 @@ struct LoginView: View {
             .ignoresSafeArea()
 
             VStack(spacing: 24) {
-                // 🌀 Logo (dùng ảnh hoặc text placeholder)
+                // 🌀 Logo
                 Image(systemName: "circle.dashed")
                     .resizable()
                     .frame(width: 60, height: 60)
@@ -122,7 +122,9 @@ struct LoginView: View {
                     Text("Don’t have an account?")
                         .foregroundColor(.gray)
                         .font(.footnote)
-                    Button(action: {}) {
+                    Button(action: {
+                        appModel.currentAuthState = .signup
+                    }) {
                         Text("Sign up")
                             .foregroundColor(.cyan)
                             .font(.footnote)
