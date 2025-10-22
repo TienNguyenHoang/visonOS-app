@@ -6,10 +6,12 @@ struct LoginView: View {
     @State private var password: String = ""
     @State private var isPasswordVisible: Bool = false
     @State private var showError: Bool = false
+    @State private var errorMessage: String = ""
+    @State private var isLoading: Bool = false
 
     var body: some View {
         ZStack {
-            // 🌌 Background gradient
+            // 🌌 Nền gradient
             LinearGradient(
                 gradient: Gradient(colors: [
                     Color.black,
@@ -100,24 +102,39 @@ struct LoginView: View {
 
                 // Error text
                 if showError {
-                    Text("❌ Invalid email or password")
+                    Text("❌ \(errorMessage)")
                         .foregroundColor(.red)
                         .font(.footnote)
                 }
 
                 // Login button
                 Button(action: login) {
-                    Text("Login")
-                        .fontWeight(.semibold)
-                        .frame(maxWidth: 320)
-                        .padding()
-                        .background(isFormValid ? Color.cyan : Color.gray.opacity(0.4))
-                        .foregroundColor(.white)
-                        .cornerRadius(8)
+                    HStack {
+                        if isLoading {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .scaleEffect(0.8)
+                        }
+                        Text(isLoading ? "Logging in..." : "Login")
+                            .fontWeight(.semibold)
+                    }
+                    .frame(maxWidth: 320)
+                    .padding()
+                    .background(isFormValid && !isLoading ? Color.cyan : Color.gray.opacity(0.4))
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
                 }
-                .disabled(!isFormValid)
+                .disabled(!isFormValid || isLoading)
 
-                // Sign up link
+                // 🔹 Test login
+                Button(action: testLogin) {
+                    Text("Test with provided credentials")
+                        .font(.footnote)
+                        .foregroundColor(.cyan)
+                        .padding(.vertical, 8)
+                }
+
+                // 🔹 Sign up link
                 VStack(spacing: 4) {
                     Text("Don’t have an account?")
                         .foregroundColor(.gray)
@@ -144,10 +161,41 @@ struct LoginView: View {
     }
 
     private func login() {
-        if email.lowercased() == "admin@example.com" && password == "123456" {
-            appModel.isLoggedIn = true
-        } else {
-            showError = true
+        performLogin(email: email, password: password)
+    }
+
+    private func testLogin() {
+        performLogin(email: "priffollavada-6662@yopmail.com", password: "aaaaa!A1")
+    }
+
+    private func performLogin(email: String, password: String) {
+        isLoading = true
+        showError = false
+
+        Task {
+            do {
+                let response = try await APIService.shared.login(email: email, password: password)
+
+                await MainActor.run {
+                    if response.success {
+                        appModel.isLoggedIn = true
+                        // Lưu token nếu có
+                        if let token = response.token {
+                            UserDefaults.standard.set(token, forKey: "auth_token")
+                        }
+                    } else {
+                        errorMessage = response.message ?? "Login failed"
+                        showError = true
+                    }
+                    isLoading = false
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = error.localizedDescription
+                    showError = true
+                    isLoading = false
+                }
+            }
         }
     }
 }
