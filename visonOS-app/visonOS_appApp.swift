@@ -14,7 +14,7 @@ struct visonOS_appApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            LoginView()
                 .environment(appModel)
         }
 

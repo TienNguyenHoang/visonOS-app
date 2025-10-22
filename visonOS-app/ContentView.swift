@@ -1,26 +1,20 @@
-//
-//  ContentView.swift
-//  visonOS-app
-//
-//  Created by Ploggvn  on 22/10/25.
-//
-
 import SwiftUI
 import RealityKit
 import RealityKitContent
 
 struct ContentView: View {
+    @Environment(AppModel.self) private var appModel
 
     var body: some View {
-        VStack {
-            Model3D(named: "Scene", bundle: realityKitContentBundle)
-                .padding(.bottom, 50)
-
-            Text("Hello, world!")
-
-            ToggleImmersiveSpaceButton()
+        Group {
+            if appModel.isLoggedIn {
+                // Sau khi đăng nhập thì vào màn 3D
+                ImmersiveView()
+            } else {
+                // Nếu chưa đăng nhập thì vào login
+                LoginView()
+            }
         }
-        .padding()
     }
 }
 

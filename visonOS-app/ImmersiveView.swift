@@ -2,7 +2,7 @@
 //  ImmersiveView.swift
 //  visonOS-app
 //
-//  Created by Ploggvn  on 22/10/25.
+//  Created by Ploggvn on 22/10/25.
 //
 
 import SwiftUI
@@ -10,17 +10,18 @@ import RealityKit
 import RealityKitContent
 
 struct ImmersiveView: View {
+    @Environment(AppModel.self) private var appModel
 
     var body: some View {
         RealityView { content in
-            // Add the initial RealityKit content
+            // Load entity từ RealityKitContent bundle
             if let immersiveContentEntity = try? await Entity(named: "Immersive", in: realityKitContentBundle) {
                 content.add(immersiveContentEntity)
-
-                // Put skybox here.  See example in World project available at
-                // https://developer.apple.com/
+            } else {
+                print("⚠️ Could not load 'Immersive' entity from RealityKitContent bundle.")
             }
         }
+        .ignoresSafeArea() // Cho phép render full màn hình
     }
 }
 
