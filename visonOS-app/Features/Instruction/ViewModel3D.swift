@@ -10,7 +10,7 @@ import RealityKitContent
 struct ViewModel3D: View {
     var body: some View {
         TimelineView(.animation) { context in
-            Model3D(named: "Can-Am Pulse", bundle: realityKitContentBundle) { model in
+            Model3D(named: "Scene", bundle: realityKitContentBundle) { model in
                 model
                     .resizable()
                     .scaledToFit()
