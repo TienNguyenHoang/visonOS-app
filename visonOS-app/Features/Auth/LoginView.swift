@@ -141,6 +141,7 @@ struct LoginView: View {
                             UserDefaults.standard.set(token, forKey: "auth_token")
                         }
                     } else {
+                        print("test2")
                         errorMessage = "Login failed"
                         showError = true
                     }
