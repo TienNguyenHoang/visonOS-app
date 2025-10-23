@@ -146,6 +146,14 @@ struct LoginView: View {
                                 print("Could not decode user ID from JWT")
                             }
                         }
+                        
+                        // Save refresh token
+                        if let refreshToken = response.refresh {
+                            UserDefaults.standard.set(refreshToken, forKey: "refresh_token")
+                            appModel.refreshToken = refreshToken
+                            print("Refresh token saved")
+                        }
+                        
                     } else {
                         print("test2")
                         errorMessage = "Login failed"

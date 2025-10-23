@@ -45,7 +45,6 @@ struct ProjectView: View {
     }
 
     // MARK: - UI Sections
-
     private var backgroundGradient: some View {
         RoundedRectangle(cornerRadius: 24)
             .fill(
@@ -140,8 +139,7 @@ struct ProjectView: View {
     // MARK: - Load Projects
 
     func loadProjects() async {
-        guard let token = appModel.jwtToken,
-              let userID = appModel.userID else {
+        guard let userID = appModel.userID else {
             errorMessage = "Missing user info"
             return
         }
@@ -150,9 +148,18 @@ struct ProjectView: View {
         errorMessage = nil
 
         do {
-            let projects = try await APIClient.shared.fetchProjects(for: userID, token: token)
+            let projects = try await APIClient.shared.fetchProjects(for: userID)
             await MainActor.run {
                 appModel.projects = projects
+            }
+        } catch let error as APIError {
+            await MainActor.run {
+                if case .tokenExpired = error {
+                    // Token expired, logout user
+                    appModel.logout()
+                } else {
+                    errorMessage = error.localizedDescription
+                }
             }
         } catch {
             await MainActor.run {

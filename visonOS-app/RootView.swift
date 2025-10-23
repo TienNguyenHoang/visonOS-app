@@ -15,7 +15,7 @@ struct RootView: View {
                 case .instruction:
                     InstructionView()
                 case .model3D:
-                    InstructionView()
+                    Model3DView()
             }
         }
         .environment(appModel)

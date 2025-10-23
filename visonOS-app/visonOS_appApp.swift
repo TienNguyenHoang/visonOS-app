@@ -8,6 +8,10 @@ struct visonOS_appApp: App {
         WindowGroup {
             RootView()
                 .environment(appModel)
+                .onAppear {
+                    // Check for stored tokens when app launches
+                    appModel.checkStoredTokens()
+                }
         }
     }
 }

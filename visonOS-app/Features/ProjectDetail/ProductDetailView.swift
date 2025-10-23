@@ -6,6 +6,7 @@ import RealityKitContent
 struct ProductDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppModel.self) private var appModel
+    @State private var rowsPerPage: Int = 10
 
     var body: some View {
         ZStack {
@@ -28,7 +29,6 @@ struct ProductDetailView: View {
 private extension ProductDetailView {
     var headerSection: some View {
         HStack(spacing: 16) {
-            // 🔹 Nút quay lại danh sách project
             Button {
                 appModel.currentScreen = .projectList
             } label: {
@@ -123,7 +123,7 @@ struct InstructionRowView: View {
 
             Spacer()
 
-            Menu {
+            Menu {  
                 Button("Instruction Details") {
                     if let id = instruction.linkInstruction {
                         appModel.selectInstruction(id)

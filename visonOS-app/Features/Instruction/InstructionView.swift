@@ -67,10 +67,7 @@ struct InstructionView: View {
                             .fixedSize(horizontal: false, vertical: true)
                         
                         // 3D model preview
-                        Model3D(named: "PizzaOven", bundle: realityKitContentBundle)
-                            .frame(width: 300, height: 250)
-                            .clipShape(RoundedRectangle(cornerRadius: 20))
-                            .shadow(radius: 10)
+                        Model3D(named: "Scene", bundle: realityKitContentBundle).frame(width: 300, height: 250) .clipShape(RoundedRectangle(cornerRadius: 20)).shadow(radius: 10)
                     }
 
                     // Info column (Tools + Parts)
