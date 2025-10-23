@@ -137,6 +137,7 @@ struct LoginView: View {
                 await MainActor.run {
                     if response.success {
                         appModel.isLoggedIn = true
+                        appModel.currentAppState = .productDetail // Reset về ProductDetailView khi login
                         if let token = response.token {
                             UserDefaults.standard.set(token, forKey: "auth_token")
                             appModel.jwtToken = token
