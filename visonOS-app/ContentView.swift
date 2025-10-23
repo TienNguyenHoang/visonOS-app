@@ -8,8 +8,15 @@ struct ContentView: View {
     var body: some View {
         Group {
             if appModel.isLoggedIn {
-                // Sau khi đăng nhập thì vào màn 3D
-                ImmersiveView()
+                // Sau khi đăng nhập thì điều hướng theo currentAppState
+                switch appModel.currentAppState {
+                case .productDetail:
+                    ProductDetailView()
+                case .detail:
+                    DetailView()
+                case .immersive:
+                    ImmersiveView()
+                }
             } else {
                 // Hiển thị Login hoặc Signup dựa trên currentAuthState
                 switch appModel.currentAuthState {

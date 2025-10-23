@@ -74,7 +74,6 @@ class APIClient {
                         throw APIError.loginFailed(message)
                     }
                 } else if let errorResponse = try? JSONDecoder().decode(LoginResponse.self, from: data) {
-                    print("test1")
                     throw APIError.loginFailed("Login failed")
                 } else {
                     throw APIError.loginFailed("Login failed with status code: \(httpResponse.statusCode)")

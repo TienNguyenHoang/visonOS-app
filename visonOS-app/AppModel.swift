@@ -15,9 +15,22 @@ class AppModel {
     enum AuthState {
         case login
     }
+    
+    enum AppState {
+        case productDetail
+        case detail
+        case immersive
+    }
 
     var immersiveSpaceState = ImmersiveSpaceState.closed
     var isLoggedIn: Bool = false
     var userEmail: String = ""
     var currentAuthState: AuthState = .login
+    var currentAppState: AppState = .productDetail
+    
+    func logout() {
+        isLoggedIn = false
+        currentAppState = .productDetail
+        UserDefaults.standard.removeObject(forKey: "auth_token")
+    }
 }
