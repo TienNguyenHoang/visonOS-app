@@ -2,7 +2,7 @@ import SwiftUI
 import RealityKit
 import RealityKitContent
 
-struct DetailView: View {
+struct InstructionView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppModel.self) private var appModel
 
@@ -165,7 +165,7 @@ struct DetailView: View {
 }
 
 #Preview {
-    DetailView()
+    InstructionView()
         .frame(width: 900, height: 600)
         .background(Color.black)
 }

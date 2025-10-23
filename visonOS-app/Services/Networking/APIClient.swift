@@ -62,23 +62,35 @@ class APIClient {
                 let loginResponse = try JSONDecoder().decode(LoginResponse.self, from: data)
                 return loginResponse
             } else {
-                // Try to decode error response for different formats
-                if let json = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
-                   let message = json["message"] as? String {
-                    // Handle nested error message
-                    if let nestedJson = message.data(using: .utf8),
-                       let nestedError = try? JSONSerialization.jsonObject(with: nestedJson, options: []) as? [String: Any],
-                       let nestedMessage = nestedError["message"] as? String {
-                        throw APIError.loginFailed(nestedMessage)
+                print("❌ [Login Error Response]: \(String(data: data, encoding: .utf8) ?? "N/A")")
+                
+                // Parse JSON ngoài cùng
+                if let outer = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
+                   let messageString = outer["message"] as? String {
+                    // Parse JSON lồng bên trong
+                    if let nestedData = messageString.data(using: .utf8),
+                       let nestedJson = try? JSONSerialization.jsonObject(with: nestedData, options: []) as? [String: Any] {
+                        // Nếu có mảng message
+                        if let messages = nestedJson["message"] as? [String] {
+                            let combined = messages.joined(separator: "\n• ")
+                            throw APIError.loginFailed("• " + combined)
+                        }
+                        // Nếu chỉ có message đơn
+                        else if let msg = nestedJson["message"] as? String {
+                            throw APIError.loginFailed(msg)
+                        }
+                        // Nếu không có message rõ ràng
+                        else {
+                            throw APIError.loginFailed("Yêu cầu không hợp lệ (Bad Request).")
+                        }
                     } else {
-                        throw APIError.loginFailed(message)
+                        throw APIError.loginFailed(messageString)
                     }
-                } else if let errorResponse = try? JSONDecoder().decode(LoginResponse.self, from: data) {
-                    throw APIError.loginFailed("Login failed")
                 } else {
                     throw APIError.loginFailed("Login failed with status code: \(httpResponse.statusCode)")
                 }
             }
+
         } catch let error as APIError {
             throw error
         } catch {

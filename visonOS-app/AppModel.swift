@@ -18,8 +18,9 @@ class AppModel {
     
     enum AppState {
         case productDetail
-        case detail
+        case instruction
         case immersive
+        case productView
     }
 
     var immersiveSpaceState = ImmersiveSpaceState.closed
@@ -28,7 +29,7 @@ class AppModel {
     var jwtToken: String? = nil
     var userID: Int? = nil
     var currentAuthState: AuthState = .login
-    var currentAppState: AppState = .productDetail
+    var currentAppState: AppState = .productView
     
     // Data model
     var projects: [Project] = []
