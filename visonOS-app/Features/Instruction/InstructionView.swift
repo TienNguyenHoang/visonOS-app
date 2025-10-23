@@ -17,7 +17,7 @@ struct InstructionView: View {
                 // Header
                 HStack {
                     Button(action: { 
-                        appModel.currentAppState = .productDetail
+                        appModel.currentScreen = .projectDetail
                     }) {
                         Image(systemName: "chevron.left")
                             .font(.title2)
@@ -131,7 +131,7 @@ struct InstructionView: View {
 
                     Button(action: {
                         // Chuyển sang ImmersiveView
-                        appModel.currentAppState = .immersive
+                        appModel.currentScreen = .model3D
                     }) {
                         Text("Start")
                             .font(.headline)

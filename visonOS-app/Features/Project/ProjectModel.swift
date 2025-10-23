@@ -52,6 +52,7 @@ struct LinkInstruction: Codable {
     let id: String?
     let linkInstruction: Int?
     let groupNameInstruction: String?
+    let variantId: String?
 }
 
 struct GroupChoice: Codable {

@@ -5,14 +5,17 @@ struct RootView: View {
 
     var body: some View {
         Group {
-            if appModel.isLoggedIn {
-                ContentView()
-            } else {
-                switch appModel.currentAuthState {
-                    case .login:
+            switch appModel.currentScreen {
+                case .login:
                     LoginView()
-                        .environment(appModel)
-                }
+                case .projectList:
+                    ProjectView()
+                case .projectDetail:
+                    ProductDetailView()
+                case .instruction:
+                    InstructionView()
+                case .model3D:
+                    InstructionView()
             }
         }
         .environment(appModel)
@@ -20,7 +23,6 @@ struct RootView: View {
         .transition(.opacity)
     }
 }
-
 
 #Preview {
     RootView()

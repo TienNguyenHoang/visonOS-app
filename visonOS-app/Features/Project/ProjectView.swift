@@ -75,7 +75,6 @@ struct ProjectView: View {
         .frame(maxWidth: .infinity)
     }
 
-    // ✅ SearchBar có textfield thực sự
     private var searchBar: some View {
         HStack {
             Image(systemName: "magnifyingglass")
@@ -116,9 +115,9 @@ struct ProjectView: View {
                     HStack(spacing: 16) {
                         ForEach(filteredProjects) { project in
                             Button {
-                                appModel.selectedProject = project
+                                appModel.selectProject(project)
                             } label: {
-                                ProductCardView(
+                                ProjectCardView(
                                     imageURL: project.firstImageURL,
                                     title: project.properties?.title?["en"] ?? "Unnamed"
                                 )
@@ -165,10 +164,7 @@ struct ProjectView: View {
     }
 }
 
-
-// MARK: - Product Card Component
-
-struct ProductCardView: View {
+struct ProjectCardView: View {
     let imageURL: String?
     let title: String
 
