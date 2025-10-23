@@ -15,8 +15,6 @@ struct ContentView: View {
                 switch appModel.currentAuthState {
                 case .login:
                     LoginView()
-                case .signup:
-                    SignUpView()
                 }
             }
         }

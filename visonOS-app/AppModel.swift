@@ -1,10 +1,3 @@
-//
-//  AppModel.swift
-//  visonOS-app
-//
-//  Created by Ploggvn  on 22/10/25.
-//
-
 import SwiftUI
 
 /// Maintains app-wide state
@@ -21,7 +14,6 @@ class AppModel {
     
     enum AuthState {
         case login
-        case signup
     }
 
     var immersiveSpaceState = ImmersiveSpaceState.closed

@@ -11,7 +11,6 @@ struct LoginView: View {
 
     var body: some View {
         ZStack {
-            // 🌌 Nền gradient
             LinearGradient(
                 gradient: Gradient(colors: [
                     Color.black,
@@ -23,21 +22,18 @@ struct LoginView: View {
             .ignoresSafeArea()
 
             VStack(spacing: 24) {
-                // 🌀 Logo
                 Image(systemName: "circle.dashed")
                     .resizable()
                     .frame(width: 60, height: 60)
                     .foregroundColor(.cyan)
                     .padding(.bottom, 4)
 
-                // Tiêu đề
                 Text("Log in")
                     .font(.title)
                     .fontWeight(.semibold)
                     .foregroundColor(.white)
                     .padding(.bottom, 10)
 
-                // Email field
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Email")
                         .font(.footnote)
@@ -56,7 +52,7 @@ struct LoginView: View {
                 }
                 .frame(maxWidth: 320)
 
-                // Password field
+
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Password")
                         .font(.footnote)
@@ -89,20 +85,9 @@ struct LoginView: View {
                 }
                 .frame(maxWidth: 320)
 
-                // Forgot password
-                HStack {
-                    Spacer()
-                    Button(action: {}) {
-                        Text("Forgot your password?")
-                            .font(.footnote)
-                            .foregroundColor(.gray)
-                    }
-                }
-                .frame(maxWidth: 320)
-
                 // Error text
                 if showError {
-                    Text("❌ \(errorMessage)")
+                    Text("\(errorMessage)")
                         .foregroundColor(.red)
                         .font(.footnote)
                 }
@@ -126,36 +111,13 @@ struct LoginView: View {
                 }
                 .disabled(!isFormValid || isLoading)
 
-                // 🔹 Test login
-                Button(action: testLogin) {
-                    Text("Test with provided credentials")
-                        .font(.footnote)
-                        .foregroundColor(.cyan)
-                        .padding(.vertical, 8)
-                }
-
-                // 🔹 Sign up link
-                VStack(spacing: 4) {
-                    Text("Don’t have an account?")
-                        .foregroundColor(.gray)
-                        .font(.footnote)
-                    Button(action: {
-                        appModel.currentAuthState = .signup
-                    }) {
-                        Text("Sign up")
-                            .foregroundColor(.cyan)
-                            .font(.footnote)
-                            .underline()
-                    }
-                }
-
                 Spacer()
             }
             .padding(.top, 100)
         }
     }
 
-    // MARK: - Logic
+
     private var isFormValid: Bool {
         !email.isEmpty && !password.isEmpty
     }
@@ -164,27 +126,22 @@ struct LoginView: View {
         performLogin(email: email, password: password)
     }
 
-    private func testLogin() {
-        performLogin(email: "priffollavada-6662@yopmail.com", password: "aaaaa!A1")
-    }
-
     private func performLogin(email: String, password: String) {
         isLoading = true
         showError = false
 
         Task {
             do {
-                let response = try await APIService.shared.login(email: email, password: password)
+                let response = try await APIClient.shared.login(email: email, password: password)
 
                 await MainActor.run {
                     if response.success {
                         appModel.isLoggedIn = true
-                        // Lưu token nếu có
                         if let token = response.token {
                             UserDefaults.standard.set(token, forKey: "auth_token")
                         }
                     } else {
-                        errorMessage = response.message ?? "Login failed"
+                        errorMessage = "Login failed"
                         showError = true
                     }
                     isLoading = false

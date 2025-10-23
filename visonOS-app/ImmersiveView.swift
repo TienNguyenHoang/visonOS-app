@@ -14,14 +14,13 @@ struct ImmersiveView: View {
 
     var body: some View {
         RealityView { content in
-            // Load entity từ RealityKitContent bundle
             if let immersiveContentEntity = try? await Entity(named: "Immersive", in: realityKitContentBundle) {
                 content.add(immersiveContentEntity)
             } else {
                 print("⚠️ Could not load 'Immersive' entity from RealityKitContent bundle.")
             }
         }
-        .ignoresSafeArea() // Cho phép render full màn hình
+        .ignoresSafeArea()
     }
 }
 

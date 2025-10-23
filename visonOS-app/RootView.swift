@@ -1,26 +1,26 @@
 import SwiftUI
 
 struct RootView: View {
-    @State private var appModel = AppModel()
+    @Environment(AppModel.self) private var appModel
 
     var body: some View {
-        ZStack {
+        Group {
             if appModel.isLoggedIn {
                 ContentView()
-                    .environment(appModel)
             } else {
                 switch appModel.currentAuthState {
-                case .login:
+                    case .login:
                     LoginView()
-                        .environment(appModel)
-                case .signup:
-                    SignUpView()
                         .environment(appModel)
                 }
             }
         }
+        .environment(appModel)
+        .animation(.easeInOut, value: appModel.isLoggedIn)
+        .transition(.opacity)
     }
 }
+
 
 #Preview {
     RootView()

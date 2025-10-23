@@ -1,18 +1,20 @@
 import Foundation
 
-// MARK: - Login Request Model
+
 struct LoginRequest: Codable {
     let scope: String
     let email: String
     let password: String
 }
 
-// MARK: - Login Response Model
+
 struct LoginResponse: Codable {
-    let success: Bool
-    let message: String?
-    let token: String?
-    let user: User?
+    let jwt: String?
+    let refresh: String?
+    let firstTimeLogin: Bool?
+    
+    var success: Bool { jwt != nil }
+    var token: String? { jwt }
 }
 
 struct User: Codable {
@@ -22,8 +24,8 @@ struct User: Codable {
 }
 
 // MARK: - API Service
-class APIService {
-    static let shared = APIService()
+class APIClient {
+    static let shared = APIClient()
     private let baseURL = "https://rc-api.synode.ai"
     
     private init() {}
@@ -72,7 +74,7 @@ class APIService {
                         throw APIError.loginFailed(message)
                     }
                 } else if let errorResponse = try? JSONDecoder().decode(LoginResponse.self, from: data) {
-                    throw APIError.loginFailed(errorResponse.message ?? "Login failed")
+                    throw APIError.loginFailed("Login failed")
                 } else {
                     throw APIError.loginFailed("Login failed with status code: \(httpResponse.statusCode)")
                 }
