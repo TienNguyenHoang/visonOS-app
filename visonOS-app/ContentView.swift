@@ -9,7 +9,7 @@ struct ContentView: View {
         Group {
             if appModel.isLoggedIn {
                 // Sau khi đăng nhập thì vào màn 3D
-                ImmersiveView()
+                ProjectView()
             } else {
                 // Hiển thị Login hoặc Signup dựa trên currentAuthState
                 switch appModel.currentAuthState {

@@ -86,6 +86,43 @@ class APIClient {
             throw APIError.networkError(error.localizedDescription)
         }
     }
+    func fetchProjects(for userId: Int, token: String) async throws -> [Project] {
+            guard let url = URL(string: "\(baseURL)/instruction/master_project/find") else {
+                throw APIError.invalidURL
+            }
+            
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            print("token nè \(token)")
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+            let payload: [String: Any] = [
+                "sender": "synode-client",
+                "scope": "synode",
+                "sent": ISO8601DateFormatter().string(from: Date()),
+                "data": [
+                    "where": ["user": userId]
+                ]
+            ]
+            
+            request.httpBody = try JSONSerialization.data(withJSONObject: payload, options: [])
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 201 else {
+                throw APIError.invalidResponse
+            }
+            print("data nè:  \(data)")
+            do {
+                let decoded = try JSONDecoder().decode(ProjectResponse.self, from: data)
+                guard let items = decoded.data?.items else {
+                    throw APIError.invalidResponse
+                }
+                return items
+            } catch {
+                throw APIError.invalidResponse
+            }
+        }
 }
 
 // MARK: - API Errors

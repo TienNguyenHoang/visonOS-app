@@ -139,6 +139,15 @@ struct LoginView: View {
                         appModel.isLoggedIn = true
                         if let token = response.token {
                             UserDefaults.standard.set(token, forKey: "auth_token")
+                            appModel.jwtToken = token
+                            if let payload = decodeJWT(token),
+                               let id = payload.id {
+                                appModel.userID = id
+                                print("userID \(id)")
+                                print("User ID decoded from token: \(id)")
+                            } else {
+                                print("Could not decode user ID from JWT")
+                            }
                         }
                     } else {
                         print("test2")
