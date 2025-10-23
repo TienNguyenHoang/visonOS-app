@@ -30,6 +30,111 @@ class APIClient {
     
     private init() {}
     
+    // MARK: - Token Management
+    func refreshToken(refreshToken: String) async throws -> LoginResponse {
+        guard let url = URL(string: "\(baseURL)/account/auth/refresh") else {
+            throw APIError.invalidURL
+        }
+        
+        let payload: [String: Any] = [
+            "refresh_token": refreshToken
+        ]
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: payload, options: [])
+        } catch {
+            throw APIError.encodingError
+        }
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw APIError.invalidResponse
+            }
+            
+            if httpResponse.statusCode == 201 {
+                let refreshResponse = try JSONDecoder().decode(LoginResponse.self, from: data)
+                return refreshResponse
+            } else {
+                print("❌ [Refresh Token Error Response]: \(String(data: data, encoding: .utf8) ?? "N/A")")
+                throw APIError.refreshTokenFailed("Refresh token failed with status code: \(httpResponse.statusCode)")
+            }
+            
+        } catch let error as APIError {
+            throw error
+        } catch {
+            throw APIError.networkError(error.localizedDescription)
+        }
+    }
+    
+    // MARK: - Authenticated Request Helper
+    private func makeAuthenticatedRequest(url: URL, method: String = "POST", payload: [String: Any]? = nil) async throws -> Data {
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        // Get current token
+        guard let token = UserDefaults.standard.string(forKey: "auth_token") else {
+            throw APIError.tokenExpired
+        }
+        
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        
+        if let payload = payload {
+            request.httpBody = try JSONSerialization.data(withJSONObject: payload, options: [])
+        }
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+        
+        // Check if token expired (401)
+        if httpResponse.statusCode == 401 {
+            // Try to refresh token
+            guard let refreshToken = UserDefaults.standard.string(forKey: "refresh_token") else {
+                throw APIError.tokenExpired
+            }
+            
+            let refreshResponse = try await self.refreshToken(refreshToken: refreshToken)
+            
+            if refreshResponse.success {
+                // Update tokens
+                if let newToken = refreshResponse.jwt {
+                    UserDefaults.standard.set(newToken, forKey: "auth_token")
+                }
+                if let newRefreshToken = refreshResponse.refresh {
+                    UserDefaults.standard.set(newRefreshToken, forKey: "refresh_token")
+                }
+                
+                // Retry original request with new token
+                request.setValue("Bearer \(refreshResponse.jwt!)", forHTTPHeaderField: "Authorization")
+                let (retryData, retryResponse) = try await URLSession.shared.data(for: request)
+                
+                guard let retryHttpResponse = retryResponse as? HTTPURLResponse,
+                      retryHttpResponse.statusCode == 201 else {
+                    throw APIError.invalidResponse
+                }
+                
+                return retryData
+            } else {
+                throw APIError.tokenExpired
+            }
+        }
+        
+        guard httpResponse.statusCode == 201 else {
+            throw APIError.invalidResponse
+        }
+        
+        return data
+    }
+    
     func login(email: String, password: String) async throws -> LoginResponse {
         guard let url = URL(string: "\(baseURL)/account/auth/login") else {
             throw APIError.invalidURL
@@ -97,43 +202,32 @@ class APIClient {
             throw APIError.networkError(error.localizedDescription)
         }
     }
-    func fetchProjects(for userId: Int, token: String) async throws -> [Project] {
-            guard let url = URL(string: "\(baseURL)/instruction/master_project/find") else {
-                throw APIError.invalidURL
-            }
-            
-            var request = URLRequest(url: url)
-            request.httpMethod = "POST"
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            print("token nè \(token)")
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-
-            let payload: [String: Any] = [
-                "sender": "synode-client",
-                "scope": "synode",
-                "sent": ISO8601DateFormatter().string(from: Date()),
-                "data": [
-                    "where": ["user": userId]
-                ]
-            ]
-            
-            request.httpBody = try JSONSerialization.data(withJSONObject: payload, options: [])
-
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 201 else {
-                throw APIError.invalidResponse
-            }
-            print("data nè:  \(data)")
-            do {
-                let decoded = try JSONDecoder().decode(ProjectResponse.self, from: data)
-                guard let items = decoded.data?.items else {
-                    throw APIError.invalidResponse
-                }
-                return items
-            } catch {
-                throw APIError.invalidResponse
-            }
+    func fetchProjects(for userId: Int) async throws -> [Project] {
+        guard let url = URL(string: "\(baseURL)/instruction/master_project/find") else {
+            throw APIError.invalidURL
         }
+        
+        let payload: [String: Any] = [
+            "sender": "synode-client",
+            "scope": "synode",
+            "sent": ISO8601DateFormatter().string(from: Date()),
+            "data": [
+                "where": ["user": userId]
+            ]
+        ]
+        
+        do {
+            let data = try await makeAuthenticatedRequest(url: url, payload: payload)
+            
+            let decoded = try JSONDecoder().decode(ProjectResponse.self, from: data)
+            guard let items = decoded.data?.items else {
+                throw APIError.invalidResponse
+            }
+            return items
+        } catch {
+            throw APIError.invalidResponse
+        }
+    }
 }
 
 // MARK: - API Errors
@@ -143,6 +237,8 @@ enum APIError: Error, LocalizedError {
     case invalidResponse
     case loginFailed(String)
     case networkError(String)
+    case tokenExpired
+    case refreshTokenFailed(String)
     
     var errorDescription: String? {
         switch self {
@@ -156,6 +252,10 @@ enum APIError: Error, LocalizedError {
             return message
         case .networkError(let message):
             return "Network error: \(message)"
+        case .tokenExpired:
+            return "Token expired. Please login again."
+        case .refreshTokenFailed(let message):
+            return "Refresh token failed: \(message)"
         }
     }
 }

@@ -19,7 +19,8 @@ struct ProductDetailView: View {
 
     // ✅ Dữ liệu mẫu — sau này bạn có thể load từ API
     let rows: [InstructionRow] = [
-        InstructionRow(index: 0, instructionID: 187, guideID: "67d3efb8ac45b03180b3d0c1", variantID: 1)
+        InstructionRow(index: 0, instructionID: 187, guideID: "67d3efb8ac45b03180b3d0c1", variantID: 1),
+         InstructionRow(index: 1, instructionID: 187, guideID: "67d3efb8ac45b03180b3d0c1", variantID: 1)
     ]
 
     var body: some View {
@@ -44,7 +45,7 @@ struct ProductDetailView: View {
 private extension ProductDetailView {
     var headerSection: some View {
         HStack {
-            Text("Instruction Table")
+            Text("Instruction")
                 .font(.title2)
                 .bold()
                 .foregroundColor(.white)

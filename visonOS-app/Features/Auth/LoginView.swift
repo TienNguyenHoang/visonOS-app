@@ -138,9 +138,12 @@ struct LoginView: View {
                     if response.success {
                         appModel.isLoggedIn = true
                         appModel.currentAppState = .productDetail // Reset về ProductDetailView khi login
+                        
+                        // Save JWT token
                         if let token = response.token {
                             UserDefaults.standard.set(token, forKey: "auth_token")
                             appModel.jwtToken = token
+                            
                             if let payload = decodeJWT(token),
                                let id = payload.id {
                                 appModel.userID = id
@@ -150,6 +153,14 @@ struct LoginView: View {
                                 print("Could not decode user ID from JWT")
                             }
                         }
+                        
+                        // Save refresh token
+                        if let refreshToken = response.refresh {
+                            UserDefaults.standard.set(refreshToken, forKey: "refresh_token")
+                            appModel.refreshToken = refreshToken
+                            print("Refresh token saved")
+                        }
+                        
                     } else {
                         print("test2")
                         errorMessage = "Login failed"
