@@ -18,7 +18,8 @@ class AppModel {
     
     enum AppState {
         case productDetail
-        case instruction
+        case instructionDetail  // Đây là InstructionView (preview)
+        case instruction        // Đây là InstructionsView (tương tác)
         case immersive
         case productView
     }

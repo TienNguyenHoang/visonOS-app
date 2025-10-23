@@ -15,6 +15,7 @@ struct InstructionRow: Identifiable {
 struct ProductDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppModel.self) private var appModel
+    @State private var rowsPerPage: Int = 10
 
     // ✅ Dữ liệu mẫu — sau này bạn có thể load từ API
     let rows: [InstructionRow] = [
@@ -114,7 +115,7 @@ private extension ProductDetailView {
                 .foregroundColor(.gray)
                 .font(.footnote)
 
-            Picker("", selection: .constant(10)) {
+            Picker("", selection: $rowsPerPage) {
                 Text("10").tag(10)
                 Text("25").tag(25)
                 Text("50").tag(50)
@@ -157,7 +158,7 @@ struct InstructionRowView: View {
 
             Spacer()
 
-            Menu {
+            Menu {  
                 Button("Instruction Details") {
                     appModel.currentAppState = .instruction
                 }

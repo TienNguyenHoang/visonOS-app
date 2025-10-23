@@ -14,8 +14,10 @@ struct ContentView: View {
                     ProjectView()
                 case .productDetail:
                     ProductDetailView()
-                case .instruction:
+                case .instructionDetail:
                     InstructionView()
+                case .instruction:
+                    InstructionsView()
                 case .immersive:
                     ImmersiveView()
                 }

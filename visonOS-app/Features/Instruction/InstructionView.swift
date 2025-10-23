@@ -67,7 +67,7 @@ struct InstructionView: View {
                             .fixedSize(horizontal: false, vertical: true)
                         
                         // 3D model preview
-                        Model3D(named: "PizzaOven", bundle: realityKitContentBundle)
+                        Model3D(named: "Scene", bundle: realityKitContentBundle)
                             .frame(width: 300, height: 250)
                             .clipShape(RoundedRectangle(cornerRadius: 20))
                             .shadow(radius: 10)
@@ -130,8 +130,8 @@ struct InstructionView: View {
                     Spacer()
 
                     Button(action: {
-                        // Chuyển sang ImmersiveView
-                        appModel.currentAppState = .immersive
+                        // Chuyển sang InstructionsView
+                        appModel.currentAppState = .instruction
                     }) {
                         Text("Start")
                             .font(.headline)

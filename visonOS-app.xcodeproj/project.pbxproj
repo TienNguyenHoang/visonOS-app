@@ -21,6 +21,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		5C050F572EAA1D83002075BF /* desk.usdz */ = {isa = PBXFileReference; lastKnownFileType = file; path = desk.usdz; sourceTree = "<group>"; };
 		D02B4AF02EA88C560071FE14 /* visonOS-app.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "visonOS-app.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		D02B4AF42EA88C560071FE14 /* RealityKitContent */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = RealityKitContent; sourceTree = "<group>"; };
 		D02B4B082EA88C570071FE14 /* visonOS-appTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "visonOS-appTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -94,6 +95,7 @@
 			isa = PBXGroup;
 			children = (
 				D02B4AF42EA88C560071FE14 /* RealityKitContent */,
+				5C050F572EAA1D83002075BF /* desk.usdz */,
 			);
 			path = Packages;
 			sourceTree = "<group>";
