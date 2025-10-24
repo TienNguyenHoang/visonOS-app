@@ -22,11 +22,17 @@ struct LoginView: View {
             .ignoresSafeArea()
 
             VStack(spacing: 24) {
-                Image(systemName: "circle.dashed")
-                    .resizable()
-                    .frame(width: 60, height: 60)
-                    .foregroundColor(.cyan)
-                    .padding(.bottom, 4)
+                HStack(spacing: 12) {
+                    Image("Image")
+                        .foregroundColor(.white)
+                        .scaleEffect(x: 0.6, y: 0.6)
+                    
+                    Text("Synode")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                }
+                .padding(.bottom, 3)
 
                 Text("Log in")
                     .font(.title)
@@ -34,6 +40,7 @@ struct LoginView: View {
                     .foregroundColor(.white)
                     .padding(.bottom, 10)
 
+                // EMAIL FIELD
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Email")
                         .font(.footnote)
@@ -42,7 +49,8 @@ struct LoginView: View {
                     TextField("", text: $email)
                         .autocapitalization(.none)
                         .keyboardType(.emailAddress)
-                        .padding(10)
+                        .padding(.vertical, 6)
+                        .padding(.horizontal, 10)
                         .background(Color.white.opacity(0.05))
                         .overlay(
                             RoundedRectangle(cornerRadius: 8)
@@ -52,31 +60,41 @@ struct LoginView: View {
                 }
                 .frame(maxWidth: 320)
 
-
+                // PASSWORD FIELD (đã chỉnh lại)
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Password")
                         .font(.footnote)
                         .foregroundColor(.gray)
 
-                    HStack {
+                    HStack(spacing: 8) {
                         if isPasswordVisible {
                             TextField("", text: $password)
                                 .textContentType(.password)
                                 .foregroundColor(.white)
+                                .font(.body)
+                                .padding(.vertical, 6) // 👈 thấp hơn
                         } else {
                             SecureField("", text: $password)
                                 .textContentType(.password)
                                 .foregroundColor(.white)
+                                .font(.body)
+                                .padding(.vertical, 6)
                         }
 
                         Button(action: {
                             isPasswordVisible.toggle()
                         }) {
                             Image(systemName: isPasswordVisible ? "eye" : "eye.slash")
-                                .foregroundColor(.gray)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 14, height: 14) // 👈 nhỏ hơn
+                                .foregroundColor(.gray.opacity(0.8))
+                                .padding(.bottom, 1) // 👈 hạ thấp icon chút
                         }
+                        .buttonStyle(.plain)
+                        .padding(.trailing, 6)
                     }
-                    .padding(10)
+                    .padding(.horizontal, 8)
                     .background(Color.white.opacity(0.05))
                     .overlay(
                         RoundedRectangle(cornerRadius: 8)
@@ -85,38 +103,42 @@ struct LoginView: View {
                 }
                 .frame(maxWidth: 320)
 
-                // Error text
+                // ERROR TEXT
                 if showError {
                     Text("\(errorMessage)")
                         .foregroundColor(.red)
                         .font(.footnote)
                 }
 
-                // Login button
-                Button(action: login) {
-                    HStack {
-                        if isLoading {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                .scaleEffect(0.8)
-                        }
-                        Text(isLoading ? "Logging in..." : "Login")
-                            .fontWeight(.semibold)
-                    }
-                    .frame(maxWidth: 320)
-                    .padding()
-                    .background(isFormValid && !isLoading ? Color.cyan : Color.gray.opacity(0.4))
-                    .foregroundColor(.white)
-                    .cornerRadius(8)
+            // Custom rounded button
+            HStack {
+                if isLoading {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .scaleEffect(0.8)
                 }
-                .disabled(!isFormValid || isLoading)
+                Text(isLoading ? "Logging in..." : "Login")
+                    .fontWeight(.semibold)
+            }
+            .frame(maxWidth: 320)
+            .padding()
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(isFormValid && !isLoading ? Color.cyan : Color.gray.opacity(0.5))
+            )
+            .foregroundColor(.white)
+            .shadow(color: Color.cyan.opacity(isFormValid ? 0.3 : 0), radius: 5, x: 0, y: 3)
+            .onTapGesture {
+                if isFormValid && !isLoading {
+                    login()
+                }
+            }
 
                 Spacer()
             }
             .padding(.top, 100)
         }
     }
-
 
     private var isFormValid: Bool {
         !email.isEmpty && !password.isEmpty
@@ -133,7 +155,6 @@ struct LoginView: View {
         Task {
             do {
                 let response = try await APIClient.shared.login(email: email, password: password)
-
                 await MainActor.run {
                     if response.success {
                         if let token = response.token {
@@ -146,16 +167,14 @@ struct LoginView: View {
                                 print("Could not decode user ID from JWT")
                             }
                         }
-                        
-                        // Save refresh token
+
                         if let refreshToken = response.refresh {
                             UserDefaults.standard.set(refreshToken, forKey: "refresh_token")
                             appModel.refreshToken = refreshToken
                             print("Refresh token saved")
                         }
-                        
+
                     } else {
-                        print("test2")
                         errorMessage = "Login failed"
                         showError = true
                     }
