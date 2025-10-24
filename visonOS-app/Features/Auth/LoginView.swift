@@ -32,7 +32,7 @@ struct LoginView: View {
                         .fontWeight(.bold)
                         .foregroundColor(.white)
                 }
-                .padding(.bottom, 4)
+                .padding(.bottom, 3)
 
                 Text("Log in")
                     .font(.title)

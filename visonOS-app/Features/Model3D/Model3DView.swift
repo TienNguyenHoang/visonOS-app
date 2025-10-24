@@ -5,123 +5,137 @@ import RealityKitContent
 struct Model3DView: View {
     @Environment(AppModel.self) private var appModel
     @State private var stepIndex = 0
-    
+
     private let steps: [InstructionStep] = [
         InstructionStep(
             title: "Step 1",
             description: "This procedure will assist you with assembling the desk.",
-            modelName: "Scene" // sử dụng Scene.usda có sẵn
+            modelName: "Scene"
         )
-        // bạn có thể thêm Step 2, 3 ở đây
     ]
-    
+
     var body: some View {
         ZStack {
-            // Nền mờ bo tròn kiểu VisionOS
-            RoundedRectangle(cornerRadius: 32)
-                .fill(.regularMaterial)
-                .opacity(0.8)
-                .frame(width: 900, height: 600)
-                .shadow(radius: 10)
-            
-            VStack(spacing: 20) {
-                // Header với nút Back
+            // NỀN CHÍNH
+            RoundedRectangle(cornerRadius: 36)
+                .fill(.ultraThinMaterial)
+                .frame(width: 950, height: 580)
+                .shadow(radius: 20)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 36)
+                        .stroke(.white.opacity(0.15))
+                )
+
+            VStack(spacing: 28) {
+                // MARK: - HEADER
                 HStack {
-                    Button(action: {
-                        // Quay về InstructionView (DetailView)
-                        appModel.currentScreen = .model3D
-                    }) {
+                    Button {
+                        appModel.currentScreen = .instruction
+                    } label: {
                         Image(systemName: "chevron.left")
-                            .font(.title2)
+                            .font(.title3)
                             .foregroundColor(.white)
                             .padding(8)
-                            .background(.gray.opacity(0.3))
+                            .background(.gray.opacity(0.25))
                             .clipShape(Circle())
                     }
-                    
+
                     Spacer()
-                    
+
                     Text("Assembly Instructions")
                         .font(.title2)
-                        .fontWeight(.bold)
+                        .fontWeight(.semibold)
                         .foregroundColor(.white)
-                    
+
                     Spacer()
-                    
-                    Button(action: {
+
+                    Button {
                         appModel.logout()
-                    }) {
+                    } label: {
                         Image(systemName: "rectangle.portrait.and.arrow.right")
-                            .font(.title2)
+                            .font(.title3)
                             .foregroundColor(.white)
                             .padding(8)
-                            .background(.red.opacity(0.7))
+                            .background(.red.opacity(0.8))
                             .clipShape(Circle())
                     }
                 }
-                .padding(.horizontal, 40)
-                .padding(.top, 20)
-                
-                HStack(spacing: 40) {
-                    // LEFT PANEL - Text info
-                    VStack(alignment: .leading, spacing: 16) {
+                .padding(.horizontal, 36)
+                .padding(.top, 16)
+
+                // MARK: - CONTENT
+                HStack(alignment: .center, spacing: 40) {
+                    // PANEL TRÁI (Text)
+                    VStack(alignment: .leading, spacing: 20) {
                         Text(steps[stepIndex].title)
-                            .font(.largeTitle)
+                            .font(.title2)
                             .fontWeight(.bold)
-                    
-                    Text("DESCRIPTION")
-                        .font(.headline)
-                        .foregroundStyle(.secondary)
-                    
-                    Text(steps[stepIndex].description)
-                        .font(.body)
-                        .foregroundStyle(.primary)
-                        .multilineTextAlignment(.leading)
-                    
-                    Spacer()
-                    
-                    // Nút điều hướng step
-                    HStack(spacing: 20) {
-                        Button {
-                            if stepIndex > 0 { stepIndex -= 1 }
-                        } label: {
-                            Image(systemName: "chevron.left")
+
+                        Text("DESCRIPTION")
+                            .font(.headline)
+                            .foregroundStyle(.secondary)
+
+                        Text(steps[stepIndex].description)
+                            .font(.body)
+                            .foregroundStyle(.primary)
+                            .padding(.bottom, 20)
+
+                        Spacer()
+
+                        // Nút điều hướng step
+                        HStack(spacing: 18) {
+                            Button {
+                                if stepIndex > 0 { stepIndex -= 1 }
+                            } label: {
+                                Image(systemName: "chevron.left")
+                                    .font(.title3)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(.cyan)
+                            .disabled(stepIndex == 0)
+
+                            Button {
+                                if stepIndex < steps.count - 1 { stepIndex += 1 }
+                            } label: {
+                                Image(systemName: "chevron.right")
+                                    .font(.title3)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(.cyan)
+                            .disabled(stepIndex == steps.count - 1)
                         }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(stepIndex == 0)
-                        
-                        Button {
-                            if stepIndex < steps.count - 1 { stepIndex += 1 }
-                        } label: {
-                            Image(systemName: "chevron.right")
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(stepIndex == steps.count - 1)
                     }
+                    .padding(32)
+                    .frame(width: 340, height: 480, alignment: .topLeading)
+                    .background(.thinMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 24))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 24)
+                            .stroke(.white.opacity(0.1))
+                    )
+                    .shadow(radius: 6, y: 4)
+
+                    // PANEL PHẢI (3D)
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 24)
+                            .fill(.thinMaterial)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 24)
+                                    .stroke(.white.opacity(0.1))
+                            )
+
+                        Model3DR(modelName: steps[stepIndex].modelName)
+                            .frame(width: 440, height: 440)
+                            .clipShape(RoundedRectangle(cornerRadius: 24))
+                    }
+                    .frame(width: 500, height: 480)
+                    .shadow(radius: 8, y: 6)
                 }
-                .padding(40)
-                .frame(width: 350, alignment: .topLeading)
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24))
-                
-                // RIGHT PANEL - 3D model
-                ZStack {
-                    RoundedRectangle(cornerRadius: 24)
-                        .fill(.thinMaterial)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 24)
-                                .stroke(.white.opacity(0.2))
-                        )
-                    
-                    Model3DR(modelName: steps[stepIndex].modelName)
-                        .frame(width: 450, height: 450)
-                        .clipShape(RoundedRectangle(cornerRadius: 24))
-                }
-                .frame(width: 500, height: 500)
-                }
+                .padding(.horizontal, 36)
+                .padding(.bottom, 20)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding()
     }
 }
 
@@ -133,19 +147,13 @@ struct Model3DView: View {
 // MARK: - Model3DView Component
 struct Model3DR: View {
     let modelName: String
-    
+
     var body: some View {
         RealityView { content in
             if let entity = try? await Entity(named: modelName, in: realityKitContentBundle) {
                 content.add(entity)
             }
         }
-        .gesture(
-            RotationGesture()
-                .onChanged { angle in
-                    // cho phép xoay model bằng tay
-                }
-        )
     }
 }
 

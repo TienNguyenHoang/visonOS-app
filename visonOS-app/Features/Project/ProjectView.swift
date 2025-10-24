@@ -108,7 +108,7 @@ struct ProjectView: View {
     // MARK: Project List
     private var projectListSection: some View {
         VStack(alignment: .leading, spacing: 24) {
-            Text("Explore Instructions Tien")
+            Text("Explore Instructions ")
                 .font(.title2.bold())
                 .foregroundColor(.white)
                 .padding(.leading, 10)
