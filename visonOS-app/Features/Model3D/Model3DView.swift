@@ -6,8 +6,8 @@ struct Model3DView: View {
     @Environment(AppModel.self) private var appModel
     @State private var stepIndex = 0
     
-    private let steps: [InstructionStep] = [
-        InstructionStep(
+    private let steps: [Model3DInstructionStep] = [
+        Model3DInstructionStep(
             title: "Step 1",
             description: "This procedure will assist you with assembling the desk.",
             modelName: "Scene" // sử dụng Scene.usda có sẵn
@@ -150,7 +150,7 @@ struct Model3DR: View {
 }
 
 // MARK: - Step Data Model
-struct InstructionStep {
+struct Model3DInstructionStep {
     let title: String
     let description: String
     let modelName: String

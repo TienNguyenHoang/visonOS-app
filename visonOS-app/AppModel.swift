@@ -29,6 +29,7 @@ class AppModel {
     
     func login(token: String, userID: Int) {
         self.jwtToken = token
+        print("token nè \(token)")
         self.userID = userID
         self.isLoggedIn = true
         self.currentScreen = .projectList

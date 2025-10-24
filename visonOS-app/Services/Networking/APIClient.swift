@@ -2,7 +2,7 @@ import Foundation
 
 class APIClient {
     static let shared = APIClient()
-    private let baseURL = "https://rc-api.synode.ai"
+    private let baseURL = "https://api.synode.ai/"
     
     private init() {}
     
@@ -66,21 +66,24 @@ class APIClient {
         }
         
         let (data, response) = try await URLSession.shared.data(for: request)
-        
+       
         guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.invalidResponse
         }
-        
+        print("http response \(httpResponse.statusCode)")
         // Check if token expired (401)
         if httpResponse.statusCode == 401 {
+            print("test12313")
             // Try to refresh token
             guard let refreshToken = UserDefaults.standard.string(forKey: "refresh_token") else {
                 throw APIError.tokenExpired
             }
+            print("tmjhui")
             
             let refreshResponse = try await self.refreshToken(refreshToken: refreshToken)
             
             if refreshResponse.success {
+                print("7657665")
                 // Update tokens
                 if let newToken = refreshResponse.jwt {
                     UserDefaults.standard.set(newToken, forKey: "auth_token")
@@ -94,17 +97,17 @@ class APIClient {
                 let (retryData, retryResponse) = try await URLSession.shared.data(for: request)
                 
                 guard let retryHttpResponse = retryResponse as? HTTPURLResponse,
-                      retryHttpResponse.statusCode == 201 else {
+                      retryHttpResponse.statusCode == 201 || retryHttpResponse.statusCode == 200 else {
                     throw APIError.invalidResponse
                 }
-                
+                print("klklk;ll")
                 return retryData
             } else {
                 throw APIError.tokenExpired
             }
         }
-        
-        guard httpResponse.statusCode == 201 else {
+        print(";;,';,")
+        guard httpResponse.statusCode == 201 || httpResponse.statusCode == 200 else {
             throw APIError.invalidResponse
         }
         
@@ -139,7 +142,8 @@ class APIClient {
                 throw APIError.invalidResponse
             }
             
-            if httpResponse.statusCode == 201 {
+            if httpResponse.statusCode == 200 || httpResponse.statusCode == 201 {
+                print("data nè \(data)")
                 let loginResponse = try JSONDecoder().decode(LoginResponse.self, from: data)
                 return loginResponse
             } else {
@@ -179,7 +183,7 @@ class APIClient {
         }
     }
     func fetchProjects(for userId: Int) async throws -> [Project] {
-        guard let url = URL(string: "\(baseURL)/instruction/master_project/find") else {
+        guard let url = URL(string: "\(baseURL)/catalog/items/find") else {
             throw APIError.invalidURL
         }
         
@@ -199,11 +203,42 @@ class APIClient {
             guard let items = decoded.data?.items else {
                 throw APIError.invalidResponse
             }
+            print("items nè \(items.count)")
             return items
         } catch {
             throw APIError.invalidResponse
         }
     }
+    func fetchInstructionDetails(for projectId: String) async throws -> [InstructionDetail] {
+            guard let url = URL(string: "\(baseURL)/instruction/displays/find") else {
+                throw APIError.invalidURL
+            }
+            print("project id \(projectId)")
+            let payload: [String: Any] = [
+                "sender": "synode-client",
+                "scope": "synode",
+                "sent": ISO8601DateFormatter().string(from: Date()),
+                "data": [
+                    "where": ["target": projectId]
+                ]
+            ]
+            
+            do {
+                let data = try await makeAuthenticatedRequest(url: url, payload: payload)
+                print("111")
+                let decoded = try JSONDecoder().decode(ProjectDetailResponse.self, from: data)
+                print("222", decoded)
+                guard let items = decoded.data?.items else {
+                    throw APIError.invalidResponse
+                }
+                
+                print("✅ Loaded \(items.count) instruction(s) for project \(projectId)")
+                return items
+            } catch {
+                print("❌ [Instruction Fetch Error]: \(error.localizedDescription)")
+                throw APIError.invalidResponse
+            }
+        }
 }
 
 enum APIError: Error, LocalizedError {
