@@ -100,7 +100,7 @@ struct ProjectView: View {
 
     private var projectListSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Explore Instructions")
+            Text("Explore Instructions Tien")
                 .font(.title2)
                 .bold()
                 .foregroundColor(.white)
