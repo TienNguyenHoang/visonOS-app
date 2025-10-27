@@ -11,28 +11,24 @@ struct LoginView: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                gradient: Gradient(colors: [
-                    Color.black,
-                    Color(red: 0.0, green: 0.15, blue: 0.18)
-                ]),
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
+            RoundedRectangle(cornerRadius: 36)
+                .fill(
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            Color.black,
+                            Color(red: 0.0, green: 0.15, blue: 0.18)
+                        ]),
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .shadow(radius: 20)
 
             VStack(spacing: 24) {
-                HStack(spacing: 12) {
-                    Image("Image")
-                        .foregroundColor(.white)
-                        .scaleEffect(x: 0.6, y: 0.6)
-                    
-                    Text("Synode")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                }
-                .padding(.bottom, 3)
+                Image("Image")
+                    .foregroundColor(.white)
+                    .scaleEffect(x: 0.6, y: 0.6)
+                    .padding(.bottom, 3)
 
                 Text("Log in")
                     .font(.title)
@@ -100,15 +96,15 @@ struct LoginView: View {
                         RoundedRectangle(cornerRadius: 8)
                             .stroke(Color.gray.opacity(0.3), lineWidth: 1)
                     )
+                    
+                    if showError {
+                        Text(errorMessage)
+                            .foregroundColor(.red)
+                            .font(.footnote)
+                            .padding(.top, 8)
+                    }
                 }
                 .frame(maxWidth: 320)
-
-                // ERROR TEXT
-                if showError {
-                    Text("\(errorMessage)")
-                        .foregroundColor(.red)
-                        .font(.footnote)
-                }
 
             // Custom rounded button
             HStack {
@@ -148,47 +144,49 @@ struct LoginView: View {
         performLogin(email: email, password: password)
     }
 
+    @MainActor
     private func performLogin(email: String, password: String) {
         isLoading = true
         showError = false
+        errorMessage = ""
 
         Task {
             do {
                 let response = try await APIClient.shared.login(email: email, password: password)
-                await MainActor.run {
-                    if response.success {
-                        if let token = response.token {
-                            UserDefaults.standard.set(token, forKey: "auth_token")
-                            if let payload = decodeJWT(token),
-                               let id = payload.id {
-                                appModel.login(token: token, userID: id)
-                                print("User ID decoded from token: \(id)")
-                            } else {
-                                print("Could not decode user ID from JWT")
-                            }
-                        }
-
-                        if let refreshToken = response.refresh {
-                            UserDefaults.standard.set(refreshToken, forKey: "refresh_token")
-                            appModel.refreshToken = refreshToken
-                            print("Refresh token saved")
-                        }
-
-                    } else {
-                        errorMessage = "Login failed"
+                
+                guard
+                    let token = response.token,
+                    let refreshToken = response.refresh,
+                    let payload = decodeJWT(token),
+                    let id = payload.id
+                else {
+                    await MainActor.run {
+                        errorMessage = "Login failed: Invalid server response"
                         showError = true
+                        isLoading = false
                     }
+                    return
+                }
+
+                await MainActor.run {
+                    appModel.login(jwt_token: token, refresh_token: refreshToken, userID: id)
                     isLoading = false
                 }
+
             } catch {
                 await MainActor.run {
-                    errorMessage = error.localizedDescription
+                    if error.localizedDescription == "Unauthorized" {
+                        errorMessage = "Invalid userName or password"
+                    } else {
+                        errorMessage = error.localizedDescription
+                    }
                     showError = true
                     isLoading = false
                 }
             }
         }
     }
+
 }
 
 #Preview {

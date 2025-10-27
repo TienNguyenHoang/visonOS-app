@@ -25,7 +25,7 @@ struct InstructionDetail: Codable, Identifiable {
     let user: Int?
     let createdBy: Int?
     let updatedBy: Int?
-    let version: Int? // ✅ đổi String → Int
+    let version: Int?
     let target: String?
     let status: String?
     let media: MediaInfo?
@@ -35,7 +35,7 @@ struct InstructionDetail: Codable, Identifiable {
     let notes: String?
     let participants: Int?
     let duration: Double?
-    let sections: [Section]?
+    let sections: [InstructionSection]?
     let createdAt: String?
     let updatedAt: String?
     let properties: InstructionProperties?
@@ -57,7 +57,7 @@ struct MediaInfo: Codable {
     let thumbnail: String?
 }
 
-struct Section: Codable {
+struct InstructionSection: Codable {
     let requirements: [String]?
     let steps: [InstructionStep]?
 }
@@ -92,6 +92,7 @@ struct InstructionProperties: Codable {
     let removeLogo: Bool?
     let advancedViewer: Bool?
     let contentInstruction: ContentInstruction?
+    let linkAssembler: String?
 }
 
 struct ContentInstruction: Codable {

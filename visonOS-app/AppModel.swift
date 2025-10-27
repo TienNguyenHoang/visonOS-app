@@ -1,12 +1,10 @@
 import SwiftUI
 
-/// Maintains app-wide state
 @Observable
 @MainActor
 class AppModel {
     // Auth
     var isLoggedIn: Bool = false
-    var userEmail: String = ""
     var jwtToken: String? = nil
     var refreshToken: String? = nil
     var userID: Int? = nil
@@ -17,7 +15,6 @@ class AppModel {
         case projectList
         case projectDetail
         case instruction
-        case model3D
     }
     
     var currentScreen: Screen = .login
@@ -25,106 +22,101 @@ class AppModel {
     // Data
     var projects: [Project] = []
     var selectedProject: Project? = nil
-    var selectedInstructionId: Int?  = nil
+    var selectedVersionId: String?  = nil
     
-    func login(token: String, userID: Int) {
-        self.jwtToken = token
-        print("token nè \(token)")
+    func login(jwt_token: String, refresh_token: String, userID: Int) {
+        self.jwtToken = jwt_token
+        self.refreshToken = refresh_token
         self.userID = userID
         self.isLoggedIn = true
         self.currentScreen = .projectList
+        UserDefaults.standard.set(jwt_token, forKey: "jwt_token")
+        UserDefaults.standard.set(refresh_token, forKey: "refresh_token")
     }
 
     func logout() {
         self.isLoggedIn = false
         self.jwtToken = nil
+        self.refreshToken = nil
         self.userID = nil
         self.projects = []
         self.currentScreen = .login
-        UserDefaults.standard.removeObject(forKey: "auth_token")
+        self.selectedProject = nil
+        self.selectedVersionId = nil
+        UserDefaults.standard.removeObject(forKey: "jwt_token")
         UserDefaults.standard.removeObject(forKey: "refresh_token")
-        jwtToken = nil
-        refreshToken = nil
-        userID = nil
     }
     
+    @MainActor
     func checkStoredTokens() {
-        if let storedToken = UserDefaults.standard.string(forKey: "auth_token"),
-           let storedRefreshToken = UserDefaults.standard.string(forKey: "refresh_token") {
-            
-            // Check if token is still valid
-            if let payload = decodeJWT(storedToken),
-               let exp = payload.exp {
-                let currentTime = Date().timeIntervalSince1970
-                
-                // If token expires in more than 5 minutes, use it
-                if Double(exp) > currentTime + 300 {
-                    jwtToken = storedToken
-                    refreshToken = storedRefreshToken
-                    isLoggedIn = true
-                    
-                    if let id = payload.id {
-                        userID = id
-                    }
-                    return
-                }
+        guard let storedToken = UserDefaults.standard.string(forKey: "jwt_token"),
+              let storedRefreshToken = UserDefaults.standard.string(forKey: "refresh_token") else {
+            return
+        }
+
+        guard let payload = decodeJWT(storedToken),
+              let exp = payload.exp else {
+            Task { await refreshToken() }
+            return
+        }
+
+        let currentTime = Date().timeIntervalSince1970
+        let bufferTime: Double = 300
+
+        if Double(exp) > currentTime + bufferTime {
+            if let id = payload.id {
+                login(jwt_token: storedToken, refresh_token: storedRefreshToken, userID: id)
+            } else {
+                Task { await refreshToken() }
             }
-            
-            // Token expired, try refresh
-            Task {
-                await refreshTokenIfNeeded()
-            }
+        } else {
+            Task { await refreshToken() }
         }
     }
     
     @MainActor
-    func refreshTokenIfNeeded() async {
+    func refreshToken() async {
         guard let currentRefreshToken = UserDefaults.standard.string(forKey: "refresh_token") else {
             logout()
             return
         }
-        
+
         do {
             let response = try await APIClient.shared.refreshToken(refreshToken: currentRefreshToken)
             
             if response.success {
-                if let newToken = response.jwt {
-                    UserDefaults.standard.set(newToken, forKey: "auth_token")
-                    jwtToken = newToken
-                    
-                    if let payload = decodeJWT(newToken),
-                       let id = payload.id {
-                        userID = id
-                    }
+                guard let newToken = response.jwt,
+                      let newRefreshToken = response.refresh else {
+                    logout()
+                    return
                 }
                 
-                if let newRefreshToken = response.refresh {
-                    UserDefaults.standard.set(newRefreshToken, forKey: "refresh_token")
-                    refreshToken = newRefreshToken
+                guard let payload = decodeJWT(newToken),
+                      let id = payload.id else {
+                    logout()
+                    return
                 }
+
+                login(jwt_token: newToken, refresh_token: newRefreshToken, userID: id)
                 
-                isLoggedIn = true
             } else {
                 logout()
             }
+
         } catch {
-            print("Failed to refresh token: \(error)")
             logout()
         }
     }
+
     
     func selectProject(_ project: Project) {
         self.selectedProject = project
         self.currentScreen = .projectDetail
     }
     
-    func selectInstruction(_ instructionId: Int) {
-        self.selectedInstructionId = instructionId
+    func selectVersion(_ versionId: String) {
+        self.selectedVersionId = versionId
         self.currentScreen = .instruction
-    }
-
-    func openModel3D() {
-        self.currentScreen = .model3D
     }
     
 }

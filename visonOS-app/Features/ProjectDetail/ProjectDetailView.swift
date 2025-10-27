@@ -13,33 +13,42 @@ struct ProjectDetailView: View {
     var body: some View {
         ZStack {
             // --- Background ---
-            RoundedRectangle(cornerRadius: 32)
-                .fill(.ultraThinMaterial)
-                .ignoresSafeArea()
+            RoundedRectangle(cornerRadius: 36)
+                .fill(
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            Color.black,
+                            Color(red: 0.0, green: 0.15, blue: 0.18)
+                        ]),
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .shadow(radius: 20)
             
             VStack(alignment: .leading, spacing: 16) {
                 headerSection
                 
                 if isLoading {
-                    ProgressView("Loading instructions...")
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.top, 100)
+                    VStack {
+                        Spacer()
+                        ProgressView("Loading instructions...")
+                            .foregroundColor(.white)
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if let errorMessage = errorMessage {
                     Text(errorMessage)
                         .foregroundColor(.red)
                         .padding()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                 } else {
-                    // Ảnh & tiêu đề luôn hiển thị
                     instructionHeader
-                    
-                    // Tabs
                     tabSelector
                     
-                    // Nội dung tab
                     Group {
                         if selectedTab == "Version History" {
-                            versionHistorySection
+                            versionHistoryList
                         } else {
                             documentPlaceholder
                         }
@@ -49,7 +58,6 @@ struct ProjectDetailView: View {
             }
             .padding(.horizontal)
         }
-        .background(Color.black)
         .task {
             await loadInstructions()
         }
@@ -64,7 +72,6 @@ struct ProjectDetailView: View {
                 Label("", systemImage: "chevron.left")
                     .foregroundColor(.white)
                     .padding(8)
-                    .background(Color.white.opacity(0.08))
                     .cornerRadius(8)
             }
             
@@ -74,16 +81,6 @@ struct ProjectDetailView: View {
                 .foregroundColor(.white)
             
             Spacer()
-            
-            Button(action: {
-                appModel.logout()
-            }) {
-                Image(systemName: "rectangle.portrait.and.arrow.right")
-                    .foregroundColor(.white)
-                    .padding(8)
-                    .background(Color.red.opacity(0.8))
-                    .clipShape(Circle())
-            }
         }
         .padding(.top, 24)
     }
@@ -111,10 +108,6 @@ struct ProjectDetailView: View {
                     .foregroundColor(.gray)
                     .cornerRadius(16)
             }
-            
-            Text(instructions.first?.title?["en"] ?? "No title")
-                .font(.headline)
-                .foregroundColor(.white)
         }
     }
     
@@ -139,64 +132,71 @@ struct ProjectDetailView: View {
         }
         .padding(.top, 8)
     }
+
     
-    // MARK: - Version History Section
-    private var versionHistorySection: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                // Header row
-                HStack {
-                    tableHeader("Version")
-                    tableHeader("Last edited")
-                    tableHeader("Status")
-                    Spacer()
-                }
-                .padding(.vertical, 8)
-                .background(Color.white.opacity(0.08))
-                .cornerRadius(12)
-                
-                Divider().background(Color.white.opacity(0.2))
-                
-                // Table rows
-                if let first = instructions.first,
-                   let versions = first.versions, !versions.isEmpty {
-                    ForEach(Array(versions.enumerated()), id: \.offset) { idx, version in
-                        HStack {
-                            tableCell("Version \(versions.count - idx)")
-                            tableCell(version.lastEditedDate ?? "-")
-                            statusBadge(isPublished: version.isPublished)
-                            Spacer()
-                            
-                            // Menu actions
-                            Menu {
-                                Button("View") {
-                                    appModel.currentScreen = .instruction
-                                }
-                                Button("Duplicate") {
-                                    // Thêm logic nếu cần
-                                }
-                            } label: {
-                                Image(systemName: "ellipsis")
-                                    .foregroundColor(.white.opacity(0.8))
-                                    .padding(.horizontal, 8)
-                            }
-                        }
-                        .padding(.vertical, 10)
-                        .padding(.horizontal, 4)
-                        .background(idx == 0 ? Color.cyan.opacity(0.25) : Color.white.opacity(0.05))
-                        .cornerRadius(10)
-                        .padding(.vertical, 2)
+    private var versionHistoryList: some View {
+        List {
+            Section(header: Text("Version History")
+                .font(.headline)
+                .foregroundColor(.white)
+            ) {
+                if !instructions.isEmpty {
+                    ForEach(Array(instructions.reversed().enumerated()), id: \.offset)
+                    { idx, instruction in
+                        VersionRow(
+                            index: idx,
+                            total: instructions.count,
+                            instruction: instruction,
+                            onSelect: { appModel.selectVersion(instruction.id) }
+                        )
                     }
                 } else {
                     Text("No version data available.")
                         .foregroundColor(.gray)
-                        .padding(.top, 12)
+                        .padding(.vertical, 8)
+                        .listRowBackground(Color.clear)
                 }
             }
-            .padding(.top, 8)
-            .padding(.bottom, 32)
+        }
+        .scrollContentBackground(.hidden)
+        .background(Color.clear)
+    }
+    
+    private struct VersionRow: View {
+        let index: Int
+        let total: Int
+        let instruction: InstructionDetail
+        let onSelect: () -> Void
+        
+        var body: some View {
+            HStack {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Version \(total - index)")
+                        .font(.headline)
+                        .foregroundColor(.white)
+
+                    Text(formattedDate(from: instruction.updatedAt ?? instruction.createdAt))
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
+
+                Spacer()
+
+                statusBadge(isPublished: instruction.status == "published" ? true : false)
+
+                Menu {
+                    Button("View", action: onSelect)
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .foregroundColor(.white.opacity(0.8))
+                }
+            }
+            .padding(.vertical, 8)
+            .listRowBackground(Color.white.opacity(0.08))
+            .cornerRadius(12)
         }
     }
+    
     
     // MARK: - Document Placeholder
     private var documentPlaceholder: some View {
@@ -215,37 +215,8 @@ struct ProjectDetailView: View {
         }
     }
     
-    // MARK: - Table Components
-    private func tableHeader(_ text: String) -> some View {
-        Text(text)
-            .font(.caption)
-            .foregroundColor(.gray)
-            .frame(maxWidth: .infinity, alignment: .leading)
-    }
+    // MARK: - Status Badge
     
-    private func tableCell(_ text: String) -> some View {
-        Text(text)
-            .font(.subheadline)
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity, alignment: .leading)
-    }
-    
-    private func statusBadge(isPublished: Bool) -> some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(isPublished ? Color.green : Color.gray)
-                .frame(width: 8, height: 8)
-            Text(isPublished ? "Published" : "Offline")
-                .font(.caption)
-                .foregroundColor(isPublished ? .white : .gray)
-                .padding(.vertical, 4)
-                .padding(.horizontal, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(isPublished ? Color.green.opacity(0.3) : Color.white.opacity(0.1))
-                )
-        }
-    }
     
     // MARK: - API Loader
     @MainActor
@@ -267,22 +238,43 @@ struct ProjectDetailView: View {
     }
 }
 
-// MARK: - Version Model (extend InstructionDetail)
-extension InstructionDetail {
-    var versions: [InstructionVersion]? {
-        sections?.first?.steps?.enumerated().map { (index, step) in
-            InstructionVersion(
-                versionNumber: index + 1,
-                lastEditedDate: "Jan 14, 2025",
-                isPublished: index % 2 == 1 // giả lập
+private func formattedDate(from isoString: String?) -> String {
+    guard let isoString = isoString else { return "-" }
+
+    // Parse từ ISO 8601 (ví dụ "2025-05-26T09:15:30Z")
+    let isoFormatter = ISO8601DateFormatter()
+    isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+    guard let date = isoFormatter.date(from: isoString)
+       ?? ISO8601DateFormatter().date(from: isoString) else { return "-" }
+
+    // Format sang dạng "May 26, 2025"
+    let displayFormatter = DateFormatter()
+    displayFormatter.dateStyle = .long
+    displayFormatter.timeStyle = .none
+    displayFormatter.locale = Locale(identifier: "en_US_POSIX")
+
+    return displayFormatter.string(from: date)
+}
+
+private func statusBadge(isPublished: Bool) -> some View {
+    HStack(spacing: 6) {
+        Circle()
+            .fill(isPublished ? Color.green : Color.gray)
+            .frame(width: 8, height: 8)
+        Text(isPublished ? "Published" : "Offline")
+            .font(.caption)
+            .foregroundColor(.white)
+            .padding(.vertical, 4)
+            .padding(.horizontal, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(isPublished ? Color.green.opacity(0.3) : Color.white.opacity(0.1))
             )
-        }
     }
 }
 
-struct InstructionVersion: Identifiable {
-    let id = UUID()
-    let versionNumber: Int
-    let lastEditedDate: String?
-    let isPublished: Bool
+#Preview {
+    ProjectDetailView()
+        .environment(AppModel())
 }

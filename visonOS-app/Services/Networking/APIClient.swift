@@ -6,7 +6,6 @@ class APIClient {
     
     private init() {}
     
-    // MARK: - Token Management
     func refreshToken(refreshToken: String) async throws -> LoginResponse {
         guard let url = URL(string: "\(baseURL)/account/auth/refresh") else {
             throw APIError.invalidURL
@@ -37,7 +36,7 @@ class APIClient {
                 let refreshResponse = try JSONDecoder().decode(LoginResponse.self, from: data)
                 return refreshResponse
             } else {
-                print("❌ [Refresh Token Error Response]: \(String(data: data, encoding: .utf8) ?? "N/A")")
+                print("[Refresh Token Error Response]: \(String(data: data, encoding: .utf8) ?? "N/A")")
                 throw APIError.refreshTokenFailed("Refresh token failed with status code: \(httpResponse.statusCode)")
             }
             
@@ -48,14 +47,12 @@ class APIClient {
         }
     }
     
-    // MARK: - Authenticated Request Helper
     private func makeAuthenticatedRequest(url: URL, method: String = "POST", payload: [String: Any]? = nil) async throws -> Data {
         var request = URLRequest(url: url)
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
-        // Get current token
-        guard let token = UserDefaults.standard.string(forKey: "auth_token") else {
+        guard let token = UserDefaults.standard.string(forKey: "jwt_token") else {
             throw APIError.tokenExpired
         }
         
@@ -73,20 +70,17 @@ class APIClient {
         print("http response \(httpResponse.statusCode)")
         // Check if token expired (401)
         if httpResponse.statusCode == 401 {
-            print("test12313")
             // Try to refresh token
             guard let refreshToken = UserDefaults.standard.string(forKey: "refresh_token") else {
                 throw APIError.tokenExpired
             }
-            print("tmjhui")
             
             let refreshResponse = try await self.refreshToken(refreshToken: refreshToken)
             
             if refreshResponse.success {
-                print("7657665")
                 // Update tokens
                 if let newToken = refreshResponse.jwt {
-                    UserDefaults.standard.set(newToken, forKey: "auth_token")
+                    UserDefaults.standard.set(newToken, forKey: "jwt_token")
                 }
                 if let newRefreshToken = refreshResponse.refresh {
                     UserDefaults.standard.set(newRefreshToken, forKey: "refresh_token")
@@ -106,7 +100,7 @@ class APIClient {
                 throw APIError.tokenExpired
             }
         }
-        print(";;,';,")
+
         guard httpResponse.statusCode == 201 || httpResponse.statusCode == 200 else {
             throw APIError.invalidResponse
         }
@@ -143,30 +137,24 @@ class APIClient {
             }
             
             if httpResponse.statusCode == 200 || httpResponse.statusCode == 201 {
-                print("data nè \(data)")
                 let loginResponse = try JSONDecoder().decode(LoginResponse.self, from: data)
                 return loginResponse
             } else {
-                print("❌ [Login Error Response]: \(String(data: data, encoding: .utf8) ?? "N/A")")
+                print("[Login Error Response]: \(String(data: data, encoding: .utf8) ?? "N/A")")
                 
-                // Parse JSON ngoài cùng
                 if let outer = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
                    let messageString = outer["message"] as? String {
-                    // Parse JSON lồng bên trong
                     if let nestedData = messageString.data(using: .utf8),
                        let nestedJson = try? JSONSerialization.jsonObject(with: nestedData, options: []) as? [String: Any] {
-                        // Nếu có mảng message
                         if let messages = nestedJson["message"] as? [String] {
                             let combined = messages.joined(separator: "\n• ")
                             throw APIError.loginFailed("• " + combined)
                         }
-                        // Nếu chỉ có message đơn
                         else if let msg = nestedJson["message"] as? String {
                             throw APIError.loginFailed(msg)
                         }
-                        // Nếu không có message rõ ràng
                         else {
-                            throw APIError.loginFailed("Yêu cầu không hợp lệ (Bad Request).")
+                            throw APIError.loginFailed("Bad Request.")
                         }
                     } else {
                         throw APIError.loginFailed(messageString)
@@ -182,6 +170,7 @@ class APIClient {
             throw APIError.networkError(error.localizedDescription)
         }
     }
+    
     func fetchProjects(for userId: Int) async throws -> [Project] {
         guard let url = URL(string: "\(baseURL)/catalog/items/find") else {
             throw APIError.invalidURL
@@ -203,12 +192,12 @@ class APIClient {
             guard let items = decoded.data?.items else {
                 throw APIError.invalidResponse
             }
-            print("items nè \(items.count)")
             return items
         } catch {
             throw APIError.invalidResponse
         }
     }
+    
     func fetchInstructionDetails(for projectId: String) async throws -> [InstructionDetail] {
             guard let url = URL(string: "\(baseURL)/instruction/displays/find") else {
                 throw APIError.invalidURL
@@ -225,18 +214,67 @@ class APIClient {
             
             do {
                 let data = try await makeAuthenticatedRequest(url: url, payload: payload)
-                print("111")
                 let decoded = try JSONDecoder().decode(ProjectDetailResponse.self, from: data)
-                print("222", decoded)
                 guard let items = decoded.data?.items else {
                     throw APIError.invalidResponse
                 }
                 
-                print("✅ Loaded \(items.count) instruction(s) for project \(projectId)")
+                print("Loaded \(items.count) instruction(s) for project \(projectId)")
                 return items
             } catch {
-                print("❌ [Instruction Fetch Error]: \(error.localizedDescription)")
+                print("[Instruction Fetch Error]: \(error.localizedDescription)")
                 throw APIError.invalidResponse
+            }
+        }
+    func fetchAssembler(by id: String) async throws -> AssemblerModel {
+            guard let url = URL(string: "\(baseURL)/instruction/assemblers/read") else {
+                throw APIError.invalidURL
+            }
+
+            let payload: [String: Any] = [
+                "sender": "synode-client",
+                "scope": "synode",
+                "sent": ISO8601DateFormatter().string(from: Date()),
+                "data": [
+                    "where": ["_id": id]
+                ]
+            ]
+
+            do {
+                let data = try await makeAuthenticatedRequest(url: url, payload: payload)
+                let decoded = try JSONDecoder().decode(AssemblerReadResponse.self, from: data)
+                guard let item = decoded.data else {
+                    throw APIError.invalidResponse
+                }
+                return item
+            } catch {
+                print("[Assembler Read Error]: \(error.localizedDescription)")
+                throw APIError.invalidResponse
+            }
+        }
+    
+    func fetchAndDecodeAnimation(from urlString: String) async throws -> AnimationModel {
+            guard let url = URL(string: urlString) else {
+                throw APIError.invalidURL
+            }
+
+            let (compressedData, response) = try await URLSession.shared.data(from: url)
+            guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+                throw APIError.invalidResponse
+            }
+
+            // 🔹 Giải nén GZIP
+            guard let decompressedData = compressedData.gunzipped() else {
+                throw APIError.invalidResponse
+            }
+
+            // 🔹 Decode JSON
+            do {
+                let decoded = try JSONDecoder().decode(AnimationModel.self, from: decompressedData)
+                return decoded
+            } catch {
+                print("[Animation Decode Error]: \(error)")
+                throw APIError.encodingError
             }
         }
 }

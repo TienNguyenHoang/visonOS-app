@@ -20,29 +20,32 @@ struct ProjectView: View {
     var body: some View {
         ZStack {
             // Nền chính - gradient mượt
-            LinearGradient(
-                gradient: Gradient(colors: [
-                    Color.black.opacity(0.95),
-                    Color(red: 0.0, green: 0.1, blue: 0.15)
-                ]),
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
+            RoundedRectangle(cornerRadius: 36)
+                .fill(
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            Color.black,
+                            Color(red: 0.0, green: 0.15, blue: 0.18)
+                        ]),
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .shadow(radius: 20)
 
             VStack(spacing: 40) {
                 headerSection
-
-                // Ô tìm kiếm tách riêng, có bóng nhẹ
+                
                 searchBar
                     .padding(.horizontal, 80)
 
-                // Phần danh sách project
                 Group {
                     if isLoading {
+                        Spacer()
                         ProgressView("Loading projects...")
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity, alignment: .center)
+                        Spacer()
                     } else if let errorMessage = errorMessage {
                         Text(errorMessage)
                             .foregroundColor(.red)
@@ -62,16 +65,33 @@ struct ProjectView: View {
 
     // MARK: Header
     private var headerSection: some View {
-        VStack(spacing: 6) {
-            Text("Synode")
-                .font(.system(size: 42, weight: .bold))
-                .foregroundColor(.white)
-
-            Text("3D Immersive Instructions")
-                .font(.headline)
-                .foregroundColor(.white.opacity(0.7))
+        HStack {
+            // Nút logout ở góc phải
+            Spacer()
+            Button {
+                appModel.logout()
+            } label: {
+                Image(systemName: "rectangle.portrait.and.arrow.right")
+                    .font(.title3)
+                    .foregroundColor(.red)
+                    .padding(8)
+                    .clipShape(Circle())
+            }
         }
+        .overlay(
+            // VStack nằm giữa tuyệt đối
+            VStack(spacing: 4) {
+                Text("Synode")
+                    .font(.system(size: 42, weight: .bold))
+                    .foregroundColor(.white)
+                Text("3D Immersive Instructions")
+                    .font(.headline)
+                    .foregroundColor(.white.opacity(0.7))
+            }
+        )
+        .padding(.horizontal)
         .frame(maxWidth: .infinity)
+
     }
 
     // MARK: Search Bar
@@ -108,15 +128,23 @@ struct ProjectView: View {
     // MARK: Project List
     private var projectListSection: some View {
         VStack(alignment: .leading, spacing: 24) {
-            Text("Explore Instructions ")
+            // Tiêu đề luôn cố định bên trái
+            Text("Explore Instructions")
                 .font(.title2.bold())
                 .foregroundColor(.white)
                 .padding(.leading, 10)
 
+            // Nội dung (scroll hoặc thông báo trống)
             if filteredProjects.isEmpty {
-                Text("No projects found.")
-                    .foregroundColor(.gray)
-                    .padding(.top, 20)
+                VStack {
+                    Spacer(minLength: 40)
+                    Text("No projects found.")
+                        .foregroundColor(.gray)
+                        .padding(.top, 20)
+                    Spacer(minLength: 0)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 180) // giữ chiều cao ổn định, tránh giật layout
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 24) {
