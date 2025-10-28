@@ -18,8 +18,13 @@ class AppModel {
     }
     
     var currentScreen: Screen = .login
+    
+    // Instruction
     var isVolumeShown: Bool = false
-
+    var currentStepIndex: Int = 0
+    var isPlaying: Bool = false
+    var modelName: String? = "test5.usdz"
+    
     // Data
     var projects: [Project] = []
     var selectedProject: Project? = nil

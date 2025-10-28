@@ -18,7 +18,9 @@ struct VisionOSApp: App {
         .windowStyle(.plain)
         
         WindowGroup(id: "volume3D") {
-            Model3DR(modelName: "test5.usdz")
+            Model3DStepViewer(modelName: appModel.modelName ?? "Scene",
+                              currentStep: appModel.currentStepIndex,
+                              mode: .volumetric)
                 .onDisappear {
                     appModel.isVolumeShown = false
                 }
