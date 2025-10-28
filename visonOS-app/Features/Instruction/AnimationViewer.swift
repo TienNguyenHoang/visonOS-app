@@ -1,7 +1,6 @@
 import SwiftUI
 import RealityKit
 
-// MARK: - SceneState giữ reference cho entity & dữ liệu
 @Observable
 class SceneState {
     var rootEntity = Entity()
@@ -9,35 +8,37 @@ class SceneState {
 }
 
 struct AnimationViewer: View {
-    @State private var sceneState = SceneState()
+    @State private var scale: CGFloat = 1.0
+    @State private var rotation: Angle = .zero
+    @State private var offset: CGSize = .zero
     
-    var body: some View {
-        RealityView { content in
-            // ✅ Load model 1 lần
-            if sceneState.rootEntity.children.isEmpty {
-                if let entity = try? await Entity.load(named: "test5.usdz") {
-                    let bounds = entity.visualBounds(relativeTo: nil)
-                    let maxDim = max(bounds.extents.x, bounds.extents.y, bounds.extents.z)
-                    let scaleFactor = 1.0 / maxDim
-                    entity.setScale(SIMD3(repeating: scaleFactor), relativeTo: nil)
-                    entity.position = -bounds.center * scaleFactor
-
-                    sceneState.rootEntity = entity
-                    content.add(entity)
-                    print("✅ Model loaded with \(entity.children.count) children.")
+    @State private var sceneState = SceneState()
+    @State private var modelAdded = false
+        
+        var body: some View {
+            RealityView { content in
+                if !modelAdded {
+                    if let entity = try? Entity.load(named: "test5.usdz") {
+                        let bounds = entity.visualBounds(relativeTo: nil)
+                        let maxDim = max(bounds.extents.x, bounds.extents.y, bounds.extents.z)
+                        let scaleFactor = 1.0 / maxDim
+                        entity.setScale(SIMD3(repeating: scaleFactor), relativeTo: nil)
+                        entity.position = -bounds.center * scaleFactor
+                        
+                        sceneState.rootEntity = entity
+                        content.add(entity)
+                        modelAdded = true
+                    }
                 }
             }
-
-            // ✅ Load JSON sau khi model load xong
-            if sceneState.project == nil {
-                Task {
-                    await loadProjectAndStart()
-                }
+            .gesture(TapGesture().onEnded {
+                print("👆 tapped model")
+            })
+            .onAppear {
+                Task { await loadProjectAndStart() }
             }
         }
-    }
-    
-    // MARK: - Load Project
+
     @MainActor
     func loadProjectAndStart() async {
         guard let url = Bundle.main.url(forResource: "test5anim", withExtension: "json") else {
@@ -50,7 +51,7 @@ struct AnimationViewer: View {
             sceneState.project = decoded
             print("✅ JSON decoded with \(decoded.nodes.count) nodes and \(decoded.steps.count) steps")
 
-            // Start animation
+            // ✅ Start animation
             startAutoAnimation()
         } catch {
             print("❌ Decode error:", error)
@@ -58,8 +59,9 @@ struct AnimationViewer: View {
     }
 
     // MARK: - Auto Animate
+    // MARK: - Auto Animate
     func startAutoAnimation() {
-        Task.detached(priority: .high) {
+        Task { @MainActor in
             guard let project = sceneState.project else { return }
             let steps = project.steps
             guard steps.count > 1 else {
@@ -67,20 +69,39 @@ struct AnimationViewer: View {
                 return
             }
 
+            // Lặp vô hạn qua các step
             while true {
                 for i in 0..<(steps.count - 1) {
-                    let fromStep = steps[i]
-                    let toStep = steps[i + 1]
                     print("🎬 Transition step \(i) → \(i + 1)")
-                    await animateTransition(from: fromStep, to: toStep, duration: 1.5)
+
+                    // ✅ Tính duration dựa trên khoảng cách giữa các node
+                    var maxDistance: Float = 0
+                    for node in project.nodes {
+                        guard let startFrame = node.steps[safe: i]?.keyframes.first,
+                              let endFrame   = node.steps[safe: i + 1]?.keyframes.first else { continue }
+
+                        let p1 = SIMD3<Float>(Float(startFrame.position.x),
+                                              Float(startFrame.position.y),
+                                              Float(startFrame.position.z))
+                        let p2 = SIMD3<Float>(Float(endFrame.position.x),
+                                              Float(endFrame.position.y),
+                                              Float(endFrame.position.z))
+                        let dist = simd_distance(p1, p2)
+                        if dist > maxDistance { maxDistance = dist }
+                    }
+                    
+                    let speed: Float = 0.1  // units per second, bạn chỉnh theo nhu cầu
+                    let stepDuration = max(0.1, Double(maxDistance / speed)) // đảm bảo >0
+                    print("⏱ Calculated duration: \(stepDuration)s")
+
+                    await animateTransition(fromStepIndex: i, toStepIndex: i + 1, duration: stepDuration)
                 }
             }
         }
     }
 
-    // MARK: - Transition Animation
-    func animateTransition(from: AnimInstructionStep, to: AnimInstructionStep, duration: Double) async {
-        print("▶️ Start transition")
+
+    func animateTransition(fromStepIndex: Int, toStepIndex: Int, duration: Double) async {
         guard let project = sceneState.project else { return }
         let startTime = Date()
 
@@ -88,29 +109,23 @@ struct AnimationViewer: View {
             let t = Float(Date().timeIntervalSince(startTime) / duration)
             let easedT = simd_smoothstep(0, 1, t)
 
-            for node in project.nodes {
-                guard let startStep = node.steps.first,
-                      let endStep = node.steps.last,
-                      let startFrame = startStep.keyframes.first,
-                      let endFrame = endStep.keyframes.first
-                else { continue }
+            // Cập nhật transform cho tất cả nodes đệ quy
+            func updateNode(_ node: Node) async {
+                guard let startFrame = node.steps[safe: fromStepIndex]?.keyframes.first,
+                      let endFrame   = node.steps[safe: toStepIndex]?.keyframes.first else { return }
 
                 guard let entity = sceneState.rootEntity.findEntity(named: node.name) else {
                     print("⚠️ Entity not found:", node.name)
-                    continue
+                    return
                 }
 
                 // Position interpolation
-                let p1 = SIMD3<Float>(
-                    Float(startFrame.position.x),
-                    Float(startFrame.position.y),
-                    Float(startFrame.position.z)
-                )
-                let p2 = SIMD3<Float>(
-                    Float(endFrame.position.x),
-                    Float(endFrame.position.y),
-                    Float(endFrame.position.z)
-                )
+                let p1 = SIMD3<Float>(Float(startFrame.position.x),
+                                      Float(startFrame.position.y),
+                                      Float(startFrame.position.z))
+                let p2 = SIMD3<Float>(Float(endFrame.position.x),
+                                      Float(endFrame.position.y),
+                                      Float(endFrame.position.z))
                 let pos = simd_mix(p1, p2, SIMD3<Float>(repeating: easedT))
 
                 // Rotation interpolation
@@ -125,33 +140,52 @@ struct AnimationViewer: View {
                 let rot = simd_slerp(q1, q2, easedT)
 
                 // Scale interpolation
-                let s1 = SIMD3<Float>(
-                    Float(startFrame.scale.x),
-                    Float(startFrame.scale.y),
-                    Float(startFrame.scale.z)
-                )
-                let s2 = SIMD3<Float>(
-                    Float(endFrame.scale.x),
-                    Float(endFrame.scale.y),
-                    Float(endFrame.scale.z)
-                )
+                let s1 = SIMD3<Float>(Float(startFrame.scale.x),
+                                      Float(startFrame.scale.y),
+                                      Float(startFrame.scale.z))
+                let s2 = SIMD3<Float>(Float(endFrame.scale.x),
+                                      Float(endFrame.scale.y),
+                                      Float(endFrame.scale.z))
                 let scl = simd_mix(s1, s2, SIMD3<Float>(repeating: easedT))
 
                 let visible = (t < 0.5) ? startFrame.visible : endFrame.visible
 
-                // ✅ Update transform gộp lại (fix RealityKit not updating)
                 await MainActor.run {
                     entity.transform = Transform(scale: scl, rotation: rot, translation: pos)
                     entity.isEnabled = visible
                 }
 
-                // Debug log
-                print("Animating:", node.name, "pos:", pos)
+                // Đệ quy update children
+                for child in node.children {
+                    await updateNode(child)
+                }
             }
 
-            try? await Task.sleep(nanoseconds: 16_000_000) // 60fps
-        }
+            for node in project.nodes {
+                await updateNode(node)
+            }
 
-        print("⏹ Transition end")
+            try? await Task.sleep(nanoseconds: 16_000_000) // ~60fps
+        }
+    }
+
+
+}
+
+// MARK: - Extension helper: Tìm entity con theo tên
+extension Entity {
+    func findEntity(named name: String) -> Entity? {
+        if self.name == name { return self }
+        for child in children {
+            if let found = child.findEntity(named: name) { return found }
+        }
+        return nil
+    }
+}
+
+// MARK: - Array safe index
+extension Array {
+    subscript(safe index: Int) -> Element? {
+        return indices.contains(index) ? self[index] : nil
     }
 }

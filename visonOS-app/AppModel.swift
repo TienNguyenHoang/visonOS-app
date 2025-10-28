@@ -18,6 +18,7 @@ class AppModel {
     }
     
     var currentScreen: Screen = .login
+    var isVolumeShown: Bool = false
 
     // Data
     var projects: [Project] = []

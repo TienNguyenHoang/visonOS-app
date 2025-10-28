@@ -25,19 +25,16 @@ struct Env: Codable {
     }
 }
 
-// MARK: - Node
 struct Node: Codable {
     let name: String
     let steps: [NodeStep]
     let children: [Node]
 }
 
-// MARK: - NodeStep
 struct NodeStep: Codable {
     let keyframes: [PurpleKeyframe]
 }
 
-// MARK: - PurpleKeyframe
 struct PurpleKeyframe: Codable {
     let position: CameraPos
     let quaternion: [Double]
