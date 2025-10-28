@@ -18,12 +18,14 @@ struct VisionOSApp: App {
         .windowStyle(.plain)
         
         WindowGroup(id: "volume3D") {
-            Model3DStepViewer(modelName: appModel.modelName ?? "Scene",
-                              currentStep: appModel.currentStepIndex,
-                              mode: .volumetric)
-                .onDisappear {
-                    appModel.isVolumeShown = false
-                }
+            Model3DStepViewer(
+                modelName: appModel.modelName ?? "Scene",
+                mode: .volumetric
+            )
+            .environment(appModel)
+            .onDisappear {
+                appModel.isVolumeShown = false
+            }
         }
         .windowStyle(.volumetric)
         .defaultSize(width: 1.5, height: 1.0, depth: 1.5, in: .meters)

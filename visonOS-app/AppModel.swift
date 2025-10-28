@@ -24,6 +24,7 @@ class AppModel {
     var currentStepIndex: Int = 0
     var isPlaying: Bool = false
     var modelName: String? = "test5.usdz"
+    var steps: [Model3DInstructionStep] = []
     
     // Data
     var projects: [Project] = []
