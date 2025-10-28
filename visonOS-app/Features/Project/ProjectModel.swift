@@ -1,5 +1,6 @@
 import Foundation
 
+// MARK: - Root Response
 struct ProjectResponse: Codable {
     let id: String?
     let sent: String?
@@ -13,41 +14,78 @@ struct ProjectResponse: Codable {
     let status: Int?
 }
 
+// MARK: - Data Container
 struct ProjectData: Codable {
     let count: Int?
     let items: [Project]?
 }
 
+// MARK: - Project
 struct Project: Codable, Identifiable {
     let id: String
     let createdAt: String?
     let updatedAt: String?
+    let createdBy: Int?
+    let updatedBy: Int?
     let user: Int?
     let client: Int?
     let scope: String?
     let upc: String?
     let name: String?
     let properties: ProjectProperties?
+    let version: Int?
 
     enum CodingKeys: String, CodingKey {
         case id = "_id"
-        case createdAt, updatedAt, user, client, scope, upc, name, properties
+        case createdAt, updatedAt, createdBy, updatedBy, user, client, scope, upc, name, properties
+        case version = "__v"
     }
 }
 
+// MARK: - Project Properties
 struct ProjectProperties: Codable {
     let title: [String: String]?
     let notes: String?
-    let docs: [String]?
-    let linkProject: [LinkInstruction]?
+    let channel: String?
+    let status: String?
+    let tags: [String]?
     let type: String?
     let media: String?
     let plan: String?
     let removeLogo: Bool?
     let radius: Bool?
+    let docs: [ProjectDoc]?
+    let qr: String?
+    let activeDisplay: String?
+    let activeDocument: String?
+    let sharingQrImageUrl: String?
+    let linkProject: [LinkInstruction]?
+    let infoInstructions: [InfoInstruction]?
     let groupChoices: [GroupChoice]?
 }
 
+// MARK: - Project Document
+struct ProjectDoc: Codable {
+    let id: String?
+    let name: String?
+    let version: String?
+    let title: [String: String]?
+    let createdAt: String?
+    let author: Author?
+    let media: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id = "_id"
+        case name, version, title, createdAt, author, media
+    }
+}
+
+struct Author: Codable {
+    let firstname: String?
+    let lastname: String?
+}
+
+// MARK: - Linked Instruction
 struct LinkInstruction: Codable {
     let id: String?
     let linkInstruction: Int?
@@ -55,6 +93,13 @@ struct LinkInstruction: Codable {
     let variantId: String?
 }
 
+// MARK: - Info Instructions (new in JSON)
+struct InfoInstruction: Codable {
+    let id: Int?
+    let thumbnail: String?
+}
+
+// MARK: - Group Choice (used for product variants)
 struct GroupChoice: Codable {
     let title: [String: String]?
     let variants: [Variant]?
@@ -73,6 +118,7 @@ struct VariantChoice: Codable {
     let optional: String?
 }
 
+// MARK: - JWT Info
 struct JWTInfo: Codable {
     let scope: String?
     let client: Int?
@@ -86,13 +132,19 @@ struct JWTInfo: Codable {
     let features: [String: Int]?
 }
 
+// MARK: - Convenience
 extension Project {
     var firstImageURL: String? {
+        properties?.media ??
         properties?
             .groupChoices?
             .first?
             .variants?
             .first?
             .choice?.image
+    }
+
+    var localizedTitle: String {
+        name ?? properties?.title?["en"] ?? "Untitled Project"
     }
 }

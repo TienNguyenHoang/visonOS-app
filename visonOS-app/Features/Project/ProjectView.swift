@@ -6,7 +6,6 @@ struct ProjectView: View {
     @State private var errorMessage: String? = nil
     @State private var searchText: String = ""
 
-    // MARK: - Computed filtered projects
     private var filteredProjects: [Project] {
         if searchText.isEmpty {
             return appModel.projects
@@ -20,98 +19,135 @@ struct ProjectView: View {
 
     var body: some View {
         ZStack {
-            backgroundGradient
-
-            VStack(alignment: .leading, spacing: 24) {
-                if isLoading {
-                    ProgressView("Loading projects...")
-                } else if let errorMessage = errorMessage {
-                    Text(errorMessage)
-                        .foregroundColor(.red)
-                } else {
-                    headerSection
-                    searchBar
-                    projectListSection
-                    Spacer()
-                    footerSection
-                }
-            }
-            .padding(32)
-        }
-        .ignoresSafeArea()
-        .task {
-            await loadProjects()
-        }
-    }
-
-    // MARK: - UI Sections
-    private var backgroundGradient: some View {
-        RoundedRectangle(cornerRadius: 24)
-            .fill(
-                LinearGradient(
-                    gradient: Gradient(colors: [
-                        Color.black,
-                        Color(red: 0.0, green: 0.15, blue: 0.18)
-                    ]),
-                    startPoint: .top,
-                    endPoint: .bottom
+            // Nền chính - gradient mượt
+            RoundedRectangle(cornerRadius: 36)
+                .fill(
+                    LinearGradient(
+                        gradient: Gradient(colors: [
+                            Color.black,
+                            Color(red: 0.0, green: 0.15, blue: 0.18)
+                        ]),
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
                 )
-            )
-            .shadow(radius: 20)
-            .padding()
-    }
+                .shadow(radius: 20)
 
-    private var headerSection: some View {
-        VStack(alignment: .center, spacing: 8) {
-            Text("Synode")
-                .font(.system(size: 40, weight: .bold))
-                .foregroundColor(.white)
+            VStack(spacing: 40) {
+                headerSection
+                
+                searchBar
+                    .padding(.horizontal, 80)
 
-            Text("3D Immersive Instructions")
-                .font(.headline)
-                .foregroundColor(.white.opacity(0.8))
+                Group {
+                    if isLoading {
+                        Spacer()
+                        ProgressView("Loading projects...")
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                        Spacer()
+                    } else if let errorMessage = errorMessage {
+                        Text(errorMessage)
+                            .foregroundColor(.red)
+                    } else {
+                        projectListSection
+                    }
+                }
+                .padding(.horizontal, 50)
+
+                Spacer(minLength: 20)
+                footerSection
+            }
+            .padding(.vertical, 50)
         }
-        .frame(maxWidth: .infinity)
+        .task { await loadProjects() }
     }
 
-    private var searchBar: some View {
+    // MARK: Header
+    private var headerSection: some View {
         HStack {
+            // Nút logout ở góc phải
+            Spacer()
+            Button {
+                appModel.logout()
+            } label: {
+                Image(systemName: "rectangle.portrait.and.arrow.right")
+                    .font(.title3)
+                    .foregroundColor(.red)
+                    .padding(8)
+                    .clipShape(Circle())
+            }
+        }
+        .overlay(
+            // VStack nằm giữa tuyệt đối
+            VStack(spacing: 4) {
+                Text("Synode")
+                    .font(.system(size: 42, weight: .bold))
+                    .foregroundColor(.white)
+                Text("3D Immersive Instructions")
+                    .font(.headline)
+                    .foregroundColor(.white.opacity(0.7))
+            }
+        )
+        .padding(.horizontal)
+        .frame(maxWidth: .infinity)
+
+    }
+
+    // MARK: Search Bar
+    private var searchBar: some View {
+        HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
-                .foregroundColor(.gray)
+                .foregroundColor(.white.opacity(0.7))
 
             TextField("Search for your product", text: $searchText)
                 .foregroundColor(.white)
                 .textFieldStyle(.plain)
                 .disableAutocorrection(true)
+                .autocapitalization(.none)
 
             if !searchText.isEmpty {
                 Button {
                     searchText = ""
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.gray)
+                        .foregroundColor(.white.opacity(0.7))
                 }
             }
         }
         .padding()
-        .background(Color.white.opacity(0.1))
-        .cornerRadius(12)
+        .background(Color.white.opacity(0.08))
+        .cornerRadius(14)
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Color.white.opacity(0.15), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 4)
     }
 
+    // MARK: Project List
     private var projectListSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 24) {
+            // Tiêu đề luôn cố định bên trái
             Text("Explore Instructions")
-                .font(.title2)
-                .bold()
+                .font(.title2.bold())
                 .foregroundColor(.white)
+                .padding(.leading, 10)
 
+            // Nội dung (scroll hoặc thông báo trống)
             if filteredProjects.isEmpty {
-                Text("No projects found.")
-                    .foregroundColor(.gray)
-                    .padding(.top, 20)
+                VStack {
+                    Spacer(minLength: 40)
+                    Text("No projects found.")
+                        .foregroundColor(.gray)
+                        .padding(.top, 20)
+                    Spacer(minLength: 0)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 180) // giữ chiều cao ổn định, tránh giật layout
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 16) {
+                    HStack(spacing: 24) {
                         ForEach(filteredProjects) { project in
                             Button {
                                 appModel.selectProject(project)
@@ -121,23 +157,25 @@ struct ProjectView: View {
                                     title: project.properties?.title?["en"] ?? "Unnamed"
                                 )
                             }
+                            .buttonStyle(PlainButtonStyle())
                         }
                     }
-                    .padding(.horizontal, 4)
+                    .padding(.horizontal, 10)
                 }
             }
         }
     }
 
+    // MARK: Footer
     private var footerSection: some View {
         Text("Access the full Synode library of projects on the mobile app.")
             .font(.footnote)
-            .foregroundColor(.white.opacity(0.8))
+            .foregroundColor(.white.opacity(0.7))
             .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.bottom, 20)
     }
 
-    // MARK: - Load Projects
-
+    // MARK: Load Projects
     func loadProjects() async {
         guard let userID = appModel.userID else {
             errorMessage = "Missing user info"
@@ -155,7 +193,6 @@ struct ProjectView: View {
         } catch let error as APIError {
             await MainActor.run {
                 if case .tokenExpired = error {
-                    // Token expired, logout user
                     appModel.logout()
                 } else {
                     errorMessage = error.localizedDescription
@@ -188,6 +225,7 @@ struct ProjectCardView: View {
                             .resizable()
                             .scaledToFit()
                             .frame(height: 60)
+                            .shadow(radius: 6)
                     case .failure:
                         Image(systemName: "cube.box.fill")
                             .resizable()
@@ -210,15 +248,16 @@ struct ProjectCardView: View {
                 .font(.headline)
                 .foregroundColor(.white)
                 .lineLimit(1)
-                .truncationMode(.tail)
         }
         .frame(width: 200, height: 160)
-        .background(Color.white.opacity(0.08))
-        .cornerRadius(20)
+        .background(Color.white.opacity(0.07))
+        .cornerRadius(24)
         .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(Color.white.opacity(0.15), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(Color.white.opacity(0.12), lineWidth: 1)
         )
+        .shadow(color: .black.opacity(0.4), radius: 12, x: 0, y: 6)
+        .hoverEffect(.lift)
     }
 }
 
