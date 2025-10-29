@@ -12,7 +12,10 @@ class APIClient {
         }
         
         let payload: [String: Any] = [
-            "refresh_token": refreshToken
+            "sent": ISO8601DateFormatter().string(from: Date()),
+            "scope": "synode",
+            "sender": "synode-client",
+            "refreshToken": refreshToken
         ]
         
         var request = URLRequest(url: url)
@@ -68,9 +71,7 @@ class APIClient {
             throw APIError.invalidResponse
         }
         print("http response \(httpResponse.statusCode)")
-        // Check if token expired (401)
         if httpResponse.statusCode == 401 {
-            // Try to refresh token
             guard let refreshToken = UserDefaults.standard.string(forKey: "refresh_token") else {
                 throw APIError.tokenExpired
             }
@@ -78,7 +79,6 @@ class APIClient {
             let refreshResponse = try await self.refreshToken(refreshToken: refreshToken)
             
             if refreshResponse.success {
-                // Update tokens
                 if let newToken = refreshResponse.jwt {
                     UserDefaults.standard.set(newToken, forKey: "jwt_token")
                 }
@@ -86,7 +86,6 @@ class APIClient {
                     UserDefaults.standard.set(newRefreshToken, forKey: "refresh_token")
                 }
                 
-                // Retry original request with new token
                 request.setValue("Bearer \(refreshResponse.jwt!)", forHTTPHeaderField: "Authorization")
                 let (retryData, retryResponse) = try await URLSession.shared.data(for: request)
                 
@@ -94,7 +93,6 @@ class APIClient {
                       retryHttpResponse.statusCode == 201 || retryHttpResponse.statusCode == 200 else {
                     throw APIError.invalidResponse
                 }
-                print("klklk;ll")
                 return retryData
             } else {
                 throw APIError.tokenExpired
@@ -226,6 +224,7 @@ class APIClient {
                 throw APIError.invalidResponse
             }
         }
+    
     func fetchAssembler(by id: String) async throws -> AssemblerModel {
             guard let url = URL(string: "\(baseURL)/instruction/assemblers/read") else {
                 throw APIError.invalidURL
@@ -263,12 +262,10 @@ class APIClient {
                 throw APIError.invalidResponse
             }
 
-            // 🔹 Giải nén GZIP
             guard let decompressedData = compressedData.gunzipped() else {
                 throw APIError.invalidResponse
             }
 
-            // 🔹 Decode JSON
             do {
                 let decoded = try JSONDecoder().decode(AnimationModel.self, from: decompressedData)
                 return decoded
@@ -290,20 +287,20 @@ enum APIError: Error, LocalizedError {
     
     var errorDescription: String? {
         switch self {
-        case .invalidURL:
-            return "Invalid URL"
-        case .encodingError:
-            return "Failed to encode request"
-        case .invalidResponse:
-            return "Invalid response"
-        case .loginFailed(let message):
-            return message
-        case .networkError(let message):
-            return "Network error: \(message)"
-        case .tokenExpired:
-            return "Token expired. Please login again."
-        case .refreshTokenFailed(let message):
-            return "Refresh token failed: \(message)"
+            case .invalidURL:
+                return "Invalid URL"
+            case .encodingError:
+                return "Failed to encode request"
+            case .invalidResponse:
+                return "Invalid response"
+            case .loginFailed(let message):
+                return message
+            case .networkError(let message):
+                return "Network error: \(message)"
+            case .tokenExpired:
+                return "Token expired. Please login again."
+            case .refreshTokenFailed(let message):
+                return "Refresh token failed: \(message)"
         }
     }
 }

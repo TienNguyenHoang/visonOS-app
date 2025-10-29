@@ -72,8 +72,8 @@ struct InstructionStep: Codable, Identifiable {
     let state: [String: String]?
     let stateRef: String?
     let index: String?
-    let stacks: [String: String]? // ✅ thêm để match JSON
-    let text: [String: String]?   // ✅ thêm để match JSON
+    let stacks: [String: String]?
+    let text: [String: String]?
 }
 
 struct CameraInfo: Codable {

@@ -1,11 +1,7 @@
 import SwiftUI
 import RealityKit
 
-@Observable
-class SceneState {
-    var rootEntity = Entity()
-    var project: AnimationModel?
-}
+
 
 struct AnimationViewer: View {
     @State private var scale: CGFloat = 1.0
@@ -170,17 +166,6 @@ struct AnimationViewer: View {
     }
 
 
-}
-
-// MARK: - Extension helper: Tìm entity con theo tên
-extension Entity {
-    func findEntity(named name: String) -> Entity? {
-        if self.name == name { return self }
-        for child in children {
-            if let found = child.findEntity(named: name) { return found }
-        }
-        return nil
-    }
 }
 
 // MARK: - Array safe index

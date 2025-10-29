@@ -7,6 +7,12 @@ enum ViewerMode {
     case volumetric
 }
 
+@Observable
+class SceneState {
+    var rootEntity = Entity()
+    var project: AnimationModel?
+}
+
 struct InstructionView: View {
     @Environment(AppModel.self) private var appModel
     @Environment(\.openWindow) private var openWindow
@@ -14,8 +20,7 @@ struct InstructionView: View {
     
     @State private var isMuted = false
     @State private var isTransitioning = false
-    
-    @State private var isLoading = true
+    @State private var isLoading = false
     
     var cleanDescription: AttributedString {
         var attr = appModel.steps[safe: appModel.currentStepIndex]?.description ?? AttributedString("")
@@ -41,22 +46,20 @@ struct InstructionView: View {
                 .ignoresSafeArea()
             
             GeometryReader { geo in
-                if isLoading {
-                    VStack {
-                        Spacer()
-                        ProgressView("Loading 3D Steps...")
-                            .foregroundColor(.white)
-                        Spacer()
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(.black.opacity(0.7))
-                } else if appModel.steps.isEmpty {
-                    Text("No steps found in project")
-                        .foregroundColor(.gray)
+                HStack(spacing: 0) {
+                    if isLoading {
+                        VStack {
+                            Spacer()
+                            ProgressView("Loading 3D Steps...")
+                                .foregroundColor(.white)
+                            Spacer()
+                        }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    HStack(spacing: 0) {
-                        // LEFT PANEL
+                    } else if appModel.steps.isEmpty {
+                        Text("No steps found in project")
+                            .foregroundColor(.gray)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
                         VStack(alignment: .leading, spacing: 20) {
                             HStack(spacing: 12) {
                                 Button {
@@ -83,8 +86,6 @@ struct InstructionView: View {
                                 .padding(.bottom, 20)
                             
                             Spacer()
-                            
-                            // CONTROL BUTTONS
                             controlButtons
                         }
                         .padding(.horizontal, 24)
@@ -92,31 +93,32 @@ struct InstructionView: View {
                         .frame(width: appModel.isVolumeShown ? geo.size.width : geo.size.width * 0.35)
                         .animation(.easeInOut(duration: 0.3), value: appModel.isVolumeShown)
                         
-                        // RIGHT PANEL (Model Preview)
                         if !appModel.isVolumeShown {
                             ZStack {
                                 Color.gray.opacity(0.15)
-                                Model3DStepViewer(
-                                    modelName: appModel.modelName ?? "Scene",
-                                    mode: .plain
-                                )
-                                .padding(40)
+                                Model3DStepViewer(mode: .plain)
+                                    .padding(40)
                             }
                             .frame(width: geo.size.width * 0.65)
                             .transition(.opacity.combined(with: .scale))
+                            .animation(.easeInOut(duration: 0.3), value: appModel.isVolumeShown)
                         }
                     }
-                    .clipShape(RoundedRectangle(cornerRadius: 36))
-                    .shadow(radius: 20)
                 }
+                .clipShape(RoundedRectangle(cornerRadius: 36))
+                .shadow(radius: 20)
             }
         }
+        // ✅ chỉ load khi chưa có data
         .task {
-            await loadProjectJson()
+            if appModel.steps.isEmpty {
+                isLoading = true
+                await loadProjectJson()
+            }
         }
     }
     
-    // MARK: - Control Buttons
+    // MARK: - Control buttons
     private var controlButtons: some View {
         HStack(spacing: 18) {
             Spacer()
@@ -213,41 +215,50 @@ struct InstructionView: View {
         }
     }
     
-    // MARK: - JSON Loader
-    @MainActor
+    // MARK: - Load JSON
     func loadProjectJson() async {
-        guard let url = Bundle.main.url(forResource: "test5anim", withExtension: "json") else {
-            print("❌ JSON not found")
-            isLoading = false
-            return
-        }
-        
         do {
-            let data = try Data(contentsOf: url)
-            let decoded = try JSONDecoder().decode(AnimationModel.self, from: data)
-            
-            // Map steps + nodes
-            appModel.steps = decoded.steps.enumerated().map { index, step in
+            let decoded: AnimationModel = try await Task.detached(priority: .background) {
+                guard let url = Bundle.main.url(forResource: "test5anim", withExtension: "json") else {
+                    throw APIError.invalidResponse
+                }
+                let data = try Data(contentsOf: url)
+                return try JSONDecoder().decode(AnimationModel.self, from: data)
+            }.value
+
+            let steps = decoded.steps.enumerated().map { index, step in
                 let title = "Step \(index + 1)"
                 let attr = step.descriptionText.text.en.htmlToAttributedString()
+
+                let firstKeyframe = step.keyframes.first
+                let camPos = firstKeyframe?.cameraPos
+                let camTarget = firstKeyframe?.cameraTarget
+
                 return Model3DInstructionStep(
                     title: title,
                     description: attr,
                     modelName: appModel.modelName ?? "Scene",
-                    nodes: decoded.nodes // truyền toàn bộ nodes để animation theo step
+                    nodes: decoded.nodes,
+                    cameraPos: camPos.map { SIMD3(Float($0.x), Float($0.y), Float($0.z)) },
+                    cameraTarget: camTarget.map { SIMD3(Float($0.x), Float($0.y), Float($0.z)) }
                 )
             }
+
+            await MainActor.run {
+                appModel.steps = steps
+                isLoading = false
+            }
         } catch {
-            print("❌ Decode error:", error)
-            appModel.steps = []
+            await MainActor.run {
+                appModel.steps = []
+                isLoading = false
+            }
         }
-        isLoading = false
     }
 }
 
-// MARK: - Model Viewer
+
 struct Model3DStepViewer: View {
-    let modelName: String
     let mode: ViewerMode
     
     @Environment(AppModel.self) private var appModel
@@ -256,49 +267,68 @@ struct Model3DStepViewer: View {
     
     var body: some View {
         RealityView { content in
-            if let entity = try? Entity.load(named: modelName) {
-                // Setup scale & position
-                let bounds = entity.visualBounds(relativeTo: nil)
-                let maxDim = max(bounds.extents.x, bounds.extents.y, bounds.extents.z)
+            // ✅ Chỉ load 1 lần
+            if sceneState.rootEntity.children.isEmpty {
+                if let entity = try? Entity.load(named: appModel.modelName ?? "Scene") {
+                    
+                    let bounds = entity.visualBounds(relativeTo: nil)
+                    let maxDim = max(bounds.extents.x, bounds.extents.y, bounds.extents.z)
+                    let baseScale: Float = 0.5 / maxDim
+                    let scale: Float = (mode == .plain) ? baseScale * 0.3 : baseScale
 
-                // ✅ scale vừa khung, đảm bảo không quá to
-                let baseScale: Float = 0.5 / maxDim
-                let scale: Float = (mode == .plain) ? baseScale * 0.3 : baseScale
+                    entity.setScale(SIMD3(repeating: scale), relativeTo: nil)
+                    entity.position = -bounds.center * scale
 
-                entity.setScale(SIMD3(repeating: scale), relativeTo: nil)
-
-                // ✅ căn giữa mô hình theo tâm
-                entity.position = SIMD3(
-                    -bounds.center.x * scale,
-                    -bounds.center.y * scale,
-                    -bounds.center.z * scale
-                )
-
-                sceneState.rootEntity = entity
-                content.add(entity)
-                self.entity = entity
-                
-                // Lấy nodes tại thời điểm hiện tại
-                let nodes = appModel.steps[safe: appModel.currentStepIndex]?.nodes ?? []
-                
-                // Tự động play step hiện tại nếu đang play
-                if appModel.isPlaying {
-                    playNodeAnimations(nodes: nodes, on: entity, stepIndex: appModel.currentStepIndex)
+                    sceneState.rootEntity = entity
+                    content.add(entity)
+                    self.entity = entity
                 }
             }
+
+            // ✅ Setup camera cho step hiện tại
+            if let step = appModel.steps[safe: appModel.currentStepIndex],
+               let cameraPos = step.cameraPos,
+               let cameraTarget = step.cameraTarget {
+
+                // Xóa camera cũ (nếu có)
+                content.entities
+                    .filter { $0 is PerspectiveCamera }
+                    .forEach { $0.removeFromParent() }
+
+                let cameraEntity = PerspectiveCamera()
+                cameraEntity.position = cameraPos
+                cameraEntity.look(at: cameraTarget, from: cameraPos, relativeTo: nil)
+                content.add(cameraEntity)
+            }
+
+            // ✅ Update animation khi state thay đổi
+            if appModel.isPlaying {
+                let nodes = appModel.steps[safe: appModel.currentStepIndex]?.nodes ?? []
+                playNodeAnimations(nodes: nodes, on: sceneState.rootEntity, stepIndex: appModel.currentStepIndex)
+            }
+
         }
         .onChange(of: appModel.currentStepIndex) { _, _ in
+            guard appModel.isPlaying else { return }
             let nodes = appModel.steps[safe: appModel.currentStepIndex]?.nodes ?? []
-            if appModel.isPlaying {
-                playNodeAnimations(nodes: nodes, on: entity, stepIndex: appModel.currentStepIndex)
+            playNodeAnimations(nodes: nodes, on: sceneState.rootEntity, stepIndex: appModel.currentStepIndex)
+            
+            // 🧭 Cập nhật camera mỗi khi đổi step
+            if let step = appModel.steps[safe: appModel.currentStepIndex],
+               let cameraPos = step.cameraPos,
+               let cameraTarget = step.cameraTarget {
+                if let cam = sceneState.rootEntity.findEntity(named: "InstructionCamera") as? PerspectiveCamera {
+                    cam.position = cameraPos
+                    cam.look(at: cameraTarget, from: cameraPos, relativeTo: nil)
+                }
             }
         }
         .onChange(of: appModel.isPlaying) { _, newValue in
             let nodes = appModel.steps[safe: appModel.currentStepIndex]?.nodes ?? []
             if newValue {
-                playNodeAnimations(nodes: nodes, on: entity, stepIndex: appModel.currentStepIndex)
+                playNodeAnimations(nodes: nodes, on: sceneState.rootEntity, stepIndex: appModel.currentStepIndex)
             } else {
-                stopAllAnimations(entity: entity)
+                stopAllAnimations(entity: sceneState.rootEntity)
             }
         }
     }
@@ -313,10 +343,8 @@ struct Model3DStepViewer: View {
                 guard let first = keyframes.first, let last = keyframes.last else { continue }
 
                 if let childEntity = parentEntity.findEntity(named: node.name) {
-
                     childEntity.isEnabled = first.visible
                     
-                    // transform bắt đầu & kết thúc
                     let start = Transform(
                         scale: SIMD3(Float(first.scale.x), Float(first.scale.y), Float(first.scale.z)),
                         rotation: simd_quatf(ix: Float(first.quaternion[0]),
@@ -339,15 +367,15 @@ struct Model3DStepViewer: View {
                                            Float(last.position.z))
                     )
 
-                    // 🪄 Tạo animation
                     let anim = FromToByAnimation<Transform>(
                         from: start,
                         to: end,
-                        duration: 1.5, // hoặc tính từ dữ liệu JSON
+                        duration: 1.5,
                         bindTarget: .transform
                     )
+
                     if let resource = try? AnimationResource.generate(with: anim) {
-                        childEntity.playAnimation(resource, transitionDuration: 0.1)
+                        childEntity.playAnimation(resource, transitionDuration: 0.05)
                     }
                 }
 
@@ -360,24 +388,33 @@ struct Model3DStepViewer: View {
         traverse(nodeList: nodes, parentEntity: entity)
     }
 
-    
     func stopAllAnimations(entity: Entity?) {
         entity?.stopAllAnimations()
     }
 }
 
 
-// MARK: - Data Model
 struct Model3DInstructionStep {
     let title: String
     let description: AttributedString?
     let modelName: String
     let nodes: [Node]
+    let cameraPos: SIMD3<Float>?
+    let cameraTarget: SIMD3<Float>?
 }
 
-// MARK: - Safe Array Access
 extension Collection {
     subscript(safe index: Index) -> Element? {
         indices.contains(index) ? self[index] : nil
+    }
+}
+
+extension Entity {
+    func findEntity(named name: String) -> Entity? {
+        if self.name == name { return self }
+        for child in children {
+            if let found = child.findEntity(named: name) { return found }
+        }
+        return nil
     }
 }

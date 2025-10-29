@@ -2,7 +2,6 @@ import SwiftUI
 import RealityKit
 
 struct ProjectDetailView: View {
-    @Environment(\.dismiss) private var dismiss
     @Environment(AppModel.self) private var appModel
     
     @State private var instructions: [InstructionDetail] = []
@@ -12,7 +11,6 @@ struct ProjectDetailView: View {
     
     var body: some View {
         ZStack {
-            // --- Background ---
             RoundedRectangle(cornerRadius: 36)
                 .fill(
                     LinearGradient(
@@ -63,7 +61,6 @@ struct ProjectDetailView: View {
         }
     }
     
-    // MARK: - Header Section
     private var headerSection: some View {
         HStack(spacing: 16) {
             Button {
@@ -85,7 +82,6 @@ struct ProjectDetailView: View {
         .padding(.top, 24)
     }
     
-    // MARK: - Instruction Header
     private var instructionHeader: some View {
         VStack(alignment: .leading, spacing: 12) {
             if let imageURL = appModel.selectedProject?.properties?.media,
@@ -111,7 +107,6 @@ struct ProjectDetailView: View {
         }
     }
     
-    // MARK: - Tab Selector
     private var tabSelector: some View {
         HStack {
             ForEach(["Version History", "Documents"], id: \.self) { tab in
@@ -197,8 +192,6 @@ struct ProjectDetailView: View {
         }
     }
     
-    
-    // MARK: - Document Placeholder
     private var documentPlaceholder: some View {
         ScrollView {
             VStack {
@@ -214,11 +207,7 @@ struct ProjectDetailView: View {
             .padding(.top, 40)
         }
     }
-    
-    // MARK: - Status Badge
-    
-    
-    // MARK: - API Loader
+
     @MainActor
     private func loadInstructions() async {
         guard let projectId = appModel.selectedProject?.id else {
@@ -241,14 +230,12 @@ struct ProjectDetailView: View {
 private func formattedDate(from isoString: String?) -> String {
     guard let isoString = isoString else { return "-" }
 
-    // Parse từ ISO 8601 (ví dụ "2025-05-26T09:15:30Z")
     let isoFormatter = ISO8601DateFormatter()
     isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
 
     guard let date = isoFormatter.date(from: isoString)
        ?? ISO8601DateFormatter().date(from: isoString) else { return "-" }
 
-    // Format sang dạng "May 26, 2025"
     let displayFormatter = DateFormatter()
     displayFormatter.dateStyle = .long
     displayFormatter.timeStyle = .none

@@ -4,7 +4,6 @@ import SwiftUI
 @MainActor
 struct VisionOSApp: App {
     @State private var appModel = AppModel()
-    @State private var headsetPositionManager = HeadsetPositionManager()
     
     var body: some Scene {
         
@@ -18,10 +17,7 @@ struct VisionOSApp: App {
         .windowStyle(.plain)
         
         WindowGroup(id: "volume3D") {
-            Model3DStepViewer(
-                modelName: appModel.modelName ?? "Scene",
-                mode: .volumetric
-            )
+            Model3DStepViewer(mode: .volumetric)
             .environment(appModel)
             .onDisappear {
                 appModel.isVolumeShown = false

@@ -14,22 +14,15 @@ struct RootView: View {
                     ProjectDetailView()
                 case .instruction:
                     InstructionView()
+                    .onDisappear{
+                        appModel.resetInstructionState()
+                    }
             }
         }
         .environment(appModel)
         .animation(.easeInOut, value: appModel.currentScreen)
         .transition(.opacity)
     }
-//    @Environment(\.openWindow) private var openWindow
-//        
-//        var body: some View {
-//            VStack {
-//                Text("Main Menu")
-//                Button("Open 3D Viewer") {
-//                    openWindow(id: VisionOSApp.viewModel3D)
-//                }
-//            }
-//        }
 }
 
 #Preview {

@@ -19,7 +19,6 @@ struct ProjectView: View {
 
     var body: some View {
         ZStack {
-            // Nền chính - gradient mượt
             RoundedRectangle(cornerRadius: 36)
                 .fill(
                     LinearGradient(
@@ -60,13 +59,15 @@ struct ProjectView: View {
             }
             .padding(.vertical, 50)
         }
-        .task { await loadProjects() }
+        .task {
+            if appModel.projects.isEmpty {
+                await loadProjects()
+            }
+        }
     }
 
-    // MARK: Header
     private var headerSection: some View {
         HStack {
-            // Nút logout ở góc phải
             Spacer()
             Button {
                 appModel.logout()
@@ -79,7 +80,6 @@ struct ProjectView: View {
             }
         }
         .overlay(
-            // VStack nằm giữa tuyệt đối
             VStack(spacing: 4) {
                 Text("Synode")
                     .font(.system(size: 42, weight: .bold))
@@ -94,7 +94,6 @@ struct ProjectView: View {
 
     }
 
-    // MARK: Search Bar
     private var searchBar: some View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
@@ -125,16 +124,13 @@ struct ProjectView: View {
         .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 4)
     }
 
-    // MARK: Project List
     private var projectListSection: some View {
         VStack(alignment: .leading, spacing: 24) {
-            // Tiêu đề luôn cố định bên trái
             Text("Explore Instructions")
                 .font(.title2.bold())
                 .foregroundColor(.white)
                 .padding(.leading, 10)
 
-            // Nội dung (scroll hoặc thông báo trống)
             if filteredProjects.isEmpty {
                 VStack {
                     Spacer(minLength: 40)
@@ -144,7 +140,7 @@ struct ProjectView: View {
                     Spacer(minLength: 0)
                 }
                 .frame(maxWidth: .infinity)
-                .frame(height: 180) // giữ chiều cao ổn định, tránh giật layout
+                .frame(height: 180)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 24) {
@@ -166,7 +162,6 @@ struct ProjectView: View {
         }
     }
 
-    // MARK: Footer
     private var footerSection: some View {
         Text("Access the full Synode library of projects on the mobile app.")
             .font(.footnote)
@@ -175,7 +170,6 @@ struct ProjectView: View {
             .padding(.bottom, 20)
     }
 
-    // MARK: Load Projects
     func loadProjects() async {
         guard let userID = appModel.userID else {
             errorMessage = "Missing user info"

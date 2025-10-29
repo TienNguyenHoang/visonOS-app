@@ -1,6 +1,5 @@
 import Foundation
 
-// MARK: - Root Response
 struct ProjectResponse: Codable {
     let id: String?
     let sent: String?
@@ -14,13 +13,11 @@ struct ProjectResponse: Codable {
     let status: Int?
 }
 
-// MARK: - Data Container
 struct ProjectData: Codable {
     let count: Int?
     let items: [Project]?
 }
 
-// MARK: - Project
 struct Project: Codable, Identifiable {
     let id: String
     let createdAt: String?
@@ -42,7 +39,6 @@ struct Project: Codable, Identifiable {
     }
 }
 
-// MARK: - Project Properties
 struct ProjectProperties: Codable {
     let title: [String: String]?
     let notes: String?
@@ -64,7 +60,6 @@ struct ProjectProperties: Codable {
     let groupChoices: [GroupChoice]?
 }
 
-// MARK: - Project Document
 struct ProjectDoc: Codable {
     let id: String?
     let name: String?
@@ -85,21 +80,17 @@ struct Author: Codable {
     let lastname: String?
 }
 
-// MARK: - Linked Instruction
 struct LinkInstruction: Codable {
     let id: String?
     let linkInstruction: Int?
     let groupNameInstruction: String?
     let variantId: String?
 }
-
-// MARK: - Info Instructions (new in JSON)
 struct InfoInstruction: Codable {
     let id: Int?
     let thumbnail: String?
 }
 
-// MARK: - Group Choice (used for product variants)
 struct GroupChoice: Codable {
     let title: [String: String]?
     let variants: [Variant]?
@@ -118,7 +109,6 @@ struct VariantChoice: Codable {
     let optional: String?
 }
 
-// MARK: - JWT Info
 struct JWTInfo: Codable {
     let scope: String?
     let client: Int?
@@ -132,7 +122,6 @@ struct JWTInfo: Codable {
     let features: [String: Int]?
 }
 
-// MARK: - Convenience
 extension Project {
     var firstImageURL: String? {
         properties?.media ??

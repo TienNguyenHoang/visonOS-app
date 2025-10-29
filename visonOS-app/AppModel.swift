@@ -126,4 +126,9 @@ class AppModel {
         self.currentScreen = .instruction
     }
     
+    func resetInstructionState() {
+        self.currentStepIndex = 0
+        self.isPlaying = false
+    }
+    
 }
