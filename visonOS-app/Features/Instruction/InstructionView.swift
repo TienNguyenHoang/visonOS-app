@@ -222,6 +222,7 @@ struct InstructionView: View {
                 guard let url = Bundle.main.url(forResource: "test5anim", withExtension: "json") else {
                     throw APIError.invalidResponse
                 }
+
                 let data = try Data(contentsOf: url)
                 return try JSONDecoder().decode(AnimationModel.self, from: data)
             }.value
@@ -248,6 +249,7 @@ struct InstructionView: View {
                 appModel.steps = steps
                 isLoading = false
             }
+
         } catch {
             await MainActor.run {
                 appModel.steps = []
@@ -255,6 +257,7 @@ struct InstructionView: View {
             }
         }
     }
+
 }
 
 
@@ -304,14 +307,22 @@ struct Model3DStepViewer: View {
             // ✅ Update animation khi state thay đổi
             if appModel.isPlaying {
                 let nodes = appModel.steps[safe: appModel.currentStepIndex]?.nodes ?? []
-                playNodeAnimations(nodes: nodes, on: sceneState.rootEntity, stepIndex: appModel.currentStepIndex)
+                playNodeAnimations(
+                    nodes: nodes,
+                    on: sceneState.rootEntity,
+                    stepIndex: appModel.currentStepIndex
+                )
             }
 
         }
         .onChange(of: appModel.currentStepIndex) { _, _ in
             guard appModel.isPlaying else { return }
             let nodes = appModel.steps[safe: appModel.currentStepIndex]?.nodes ?? []
-            playNodeAnimations(nodes: nodes, on: sceneState.rootEntity, stepIndex: appModel.currentStepIndex)
+            playNodeAnimations(
+                nodes: nodes,
+                on: sceneState.rootEntity,
+                stepIndex: appModel.currentStepIndex
+            )
             
             // 🧭 Cập nhật camera mỗi khi đổi step
             if let step = appModel.steps[safe: appModel.currentStepIndex],
@@ -326,7 +337,11 @@ struct Model3DStepViewer: View {
         .onChange(of: appModel.isPlaying) { _, newValue in
             let nodes = appModel.steps[safe: appModel.currentStepIndex]?.nodes ?? []
             if newValue {
-                playNodeAnimations(nodes: nodes, on: sceneState.rootEntity, stepIndex: appModel.currentStepIndex)
+                playNodeAnimations(
+                    nodes: nodes,
+                    on: sceneState.rootEntity,
+                    stepIndex: appModel.currentStepIndex
+                )
             } else {
                 stopAllAnimations(entity: sceneState.rootEntity)
             }
@@ -336,35 +351,58 @@ struct Model3DStepViewer: View {
     func playNodeAnimations(nodes: [Node], on entity: Entity?, stepIndex: Int) {
         guard let entity else { return }
 
+        var controllers: [AnimationPlaybackController] = []
+
         func traverse(nodeList: [Node], parentEntity: Entity) {
             for node in nodeList {
                 guard stepIndex < node.steps.count else { continue }
+                
                 let keyframes = node.steps[stepIndex].keyframes
-                guard let first = keyframes.first, let last = keyframes.last else { continue }
+                guard keyframes.count > 1 else { continue }
+                print("\(node.name) keyframes-\(keyframes.count)")
+                guard let childEntity = parentEntity.findEntity(named: node.name) else { continue }
+                childEntity.isEnabled = keyframes.first?.visible ?? true
 
-                if let childEntity = parentEntity.findEntity(named: node.name) {
-                    childEntity.isEnabled = first.visible
-                    
+                for i in 0 ..< keyframes.count - 1 {
+                    let firstMove = keyframes[i]
+                    let lastMove = keyframes[i + 1]
+
                     let start = Transform(
-                        scale: SIMD3(Float(first.scale.x), Float(first.scale.y), Float(first.scale.z)),
-                        rotation: simd_quatf(ix: Float(first.quaternion[0]),
-                                             iy: Float(first.quaternion[1]),
-                                             iz: Float(first.quaternion[2]),
-                                             r: Float(first.quaternion[3])),
-                        translation: SIMD3(Float(first.position.x),
-                                           Float(first.position.y),
-                                           Float(first.position.z))
+                        scale: SIMD3(
+                            Float(firstMove.scale.x),
+                            Float(firstMove.scale.y),
+                            Float(firstMove.scale.z)
+                        ),
+                        rotation: simd_quatf(
+                            ix: Float(firstMove.quaternion[0]),
+                            iy: Float(firstMove.quaternion[2]),
+                            iz: -Float(firstMove.quaternion[1]),
+                            r: Float(firstMove.quaternion[3])
+                        ),
+                        translation: SIMD3(
+                            -Float(firstMove.position.z),
+                            Float(firstMove.position.x),
+                            Float(firstMove.position.y)
+                        )
                     )
 
                     let end = Transform(
-                        scale: SIMD3(Float(last.scale.x), Float(last.scale.y), Float(last.scale.z)),
-                        rotation: simd_quatf(ix: Float(last.quaternion[0]),
-                                             iy: Float(last.quaternion[1]),
-                                             iz: Float(last.quaternion[2]),
-                                             r: Float(last.quaternion[3])),
-                        translation: SIMD3(Float(last.position.x),
-                                           Float(last.position.y),
-                                           Float(last.position.z))
+                        scale: SIMD3(
+                            Float(lastMove.scale.x),
+                            Float(lastMove.scale.y),
+                            Float(lastMove.scale.z)
+                        ),
+                        rotation: simd_quatf(
+                            ix: Float(lastMove.quaternion[0]),
+                            iy: Float(lastMove.quaternion[2]),
+                            iz: -Float(lastMove.quaternion[1]),
+                            r: Float(lastMove.quaternion[3])
+                        ),
+                        translation: SIMD3(
+                            -Float(lastMove.position.z),
+                            Float(lastMove.position.x),
+                            Float(lastMove.position.y)
+                        )
                     )
 
                     let anim = FromToByAnimation<Transform>(
@@ -375,10 +413,12 @@ struct Model3DStepViewer: View {
                     )
 
                     if let resource = try? AnimationResource.generate(with: anim) {
-                        childEntity.playAnimation(resource, transitionDuration: 0.05)
+                        // 🚀 tạo controller nhưng tạm dừng ngay
+                        let controller = childEntity.playAnimation(resource, transitionDuration: 0, startsPaused: true)
+                        controllers.append(controller)
                     }
                 }
-
+                
                 if !node.children.isEmpty {
                     traverse(nodeList: node.children, parentEntity: parentEntity)
                 }
@@ -386,7 +426,14 @@ struct Model3DStepViewer: View {
         }
 
         traverse(nodeList: nodes, parentEntity: entity)
+
+        // 🎬 Sau khi đã setup hết → resume đồng thời tất cả
+        controllers.forEach { $0.resume() }
     }
+
+
+
+
 
     func stopAllAnimations(entity: Entity?) {
         entity?.stopAllAnimations()
