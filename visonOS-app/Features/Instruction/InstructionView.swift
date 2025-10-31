@@ -1,34 +1,30 @@
 import SwiftUI
 import RealityKit
 import RealityKitContent
+import Combine
 
 enum ViewerMode {
     case plain
     case volumetric
 }
 
-@Observable
-class SceneState {
-    var rootEntity = Entity()
-    var project: AnimationModel?
-}
-
 struct InstructionView: View {
     @Environment(AppModel.self) private var appModel
+    @Environment(SceneState.self) private var sceneState
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
-    
+
     @State private var isMuted = false
     @State private var isTransitioning = false
     @State private var isLoading = false
-    
+
     var cleanDescription: AttributedString {
         var attr = appModel.steps[safe: appModel.currentStepIndex]?.description ?? AttributedString("")
         attr.foregroundColor = .white
         attr.font = .body
         return attr
     }
-    
+
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 36)
@@ -44,7 +40,7 @@ struct InstructionView: View {
                 )
                 .shadow(radius: 20)
                 .ignoresSafeArea()
-            
+
             GeometryReader { geo in
                 HStack(spacing: 0) {
                     if isLoading {
@@ -63,7 +59,18 @@ struct InstructionView: View {
                         VStack(alignment: .leading, spacing: 20) {
                             HStack(spacing: 12) {
                                 Button {
-                                    appModel.currentScreen = .projectDetail
+                                   
+                                   sceneState.rootEntity.removeFromParent()
+                                   sceneState.rootEntity = Entity()
+                                   sceneState.project = nil
+
+                                   if appModel.isVolumeShown {
+                                       dismissWindow(id: "volume3D")
+                                       appModel.isVolumeShown = false
+                                   }
+
+                                   appModel.currentScreen = .projectDetail
+
                                 } label: {
                                     Image(systemName: "chevron.left")
                                         .font(.title3)
@@ -78,13 +85,13 @@ struct InstructionView: View {
                                     .fontWeight(.bold)
                                     .foregroundColor(.white)
                             )
-                            
+
                             Text("DESCRIPTION")
                                 .font(.headline)
                                 .foregroundColor(.white.opacity(0.7))
                             Text(cleanDescription)
                                 .padding(.bottom, 20)
-                            
+
                             Spacer()
                             controlButtons
                         }
@@ -92,11 +99,12 @@ struct InstructionView: View {
                         .padding(.vertical, 20)
                         .frame(width: appModel.isVolumeShown ? geo.size.width : geo.size.width * 0.35)
                         .animation(.easeInOut(duration: 0.3), value: appModel.isVolumeShown)
-                        
+
                         if !appModel.isVolumeShown {
                             ZStack {
                                 Color.gray.opacity(0.15)
                                 Model3DStepViewer(mode: .plain)
+                                    .environment(sceneState)
                                     .padding(40)
                             }
                             .frame(width: geo.size.width * 0.65)
@@ -109,7 +117,6 @@ struct InstructionView: View {
                 .shadow(radius: 20)
             }
         }
-        // ✅ chỉ load khi chưa có data
         .task {
             if appModel.steps.isEmpty {
                 isLoading = true
@@ -117,12 +124,11 @@ struct InstructionView: View {
             }
         }
     }
-    
-    // MARK: - Control buttons
+
     private var controlButtons: some View {
         HStack(spacing: 18) {
             Spacer()
-            
+
             Button {
                 isMuted.toggle()
             } label: {
@@ -132,9 +138,9 @@ struct InstructionView: View {
             }
             .buttonStyle(.bordered)
             .tint(isMuted ? .gray : .indigo)
-            
+
             Spacer()
-            
+
             Button {
                 if appModel.currentStepIndex > 0 {
                     appModel.currentStepIndex -= 1
@@ -147,7 +153,7 @@ struct InstructionView: View {
             .buttonStyle(.borderedProminent)
             .tint(.cyan)
             .disabled(appModel.currentStepIndex == 0)
-            
+
             Button {
                 appModel.isPlaying.toggle()
             } label: {
@@ -169,7 +175,7 @@ struct InstructionView: View {
                     .shadow(color: .cyan.opacity(0.6), radius: 8, y: 2)
             }
             .buttonStyle(.plain)
-            
+
             Button {
                 if appModel.currentStepIndex < appModel.steps.count - 1 {
                     appModel.currentStepIndex += 1
@@ -182,24 +188,24 @@ struct InstructionView: View {
             .buttonStyle(.borderedProminent)
             .tint(.cyan)
             .disabled(appModel.currentStepIndex == appModel.steps.count - 1)
-            
+
             Spacer()
-            
+
             Button {
                 Task {
                     guard !isTransitioning else { return }
                     isTransitioning = true
-                    
+                    appModel.isPlaying = false
                     if appModel.isVolumeShown {
                         dismissWindow(id: "volume3D")
                     } else {
                         openWindow(id: "volume3D")
                     }
-                    
+
                     withAnimation(.easeInOut(duration: 0.3)) {
                         appModel.isVolumeShown.toggle()
                     }
-                    
+
                     try? await Task.sleep(nanoseconds: 400_000_000)
                     isTransitioning = false
                 }
@@ -210,12 +216,11 @@ struct InstructionView: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(appModel.isVolumeShown ? .orange : .purple)
-            
+
             Spacer()
         }
     }
-    
-    // MARK: - Load JSON
+
     func loadProjectJson() async {
         do {
             let decoded: AnimationModel = try await Task.detached(priority: .background) {
@@ -257,189 +262,352 @@ struct InstructionView: View {
             }
         }
     }
-
 }
-
 
 struct Model3DStepViewer: View {
     let mode: ViewerMode
-    
+
     @Environment(AppModel.self) private var appModel
-    @State private var sceneState = SceneState()
-    @State private var entity: Entity?
-    
+    @Environment(SceneState.self) private var sceneState
+
+    @State private var startTime: TimeInterval = 0
+    @State private var isAnimating: Bool = false
+    @State private var frameDuration: TimeInterval = 1.0
+    @State private var updateCancellable: Cancellable?
+
     var body: some View {
+        
         RealityView { content in
-            // ✅ Chỉ load 1 lần
-            if sceneState.rootEntity.children.isEmpty {
-                if let entity = try? Entity.load(named: appModel.modelName ?? "Scene") {
+            if sceneState.rootEntity.children.isEmpty || sceneState.currentMode != mode {
+                if let loaded = try? Entity.load(named: appModel.modelName ?? "Scene") {
+                    sceneState.currentMode = mode
                     
-                    let bounds = entity.visualBounds(relativeTo: nil)
+                    let bounds = loaded.visualBounds(relativeTo: nil)
                     let maxDim = max(bounds.extents.x, bounds.extents.y, bounds.extents.z)
                     let baseScale: Float = 0.5 / maxDim
                     let scale: Float = (mode == .plain) ? baseScale * 0.3 : baseScale
 
-                    entity.setScale(SIMD3(repeating: scale), relativeTo: nil)
-                    entity.position = -bounds.center * scale
+                    loaded.setScale(SIMD3(repeating: scale), relativeTo: nil)
+                    loaded.position = -bounds.center * scale
 
-                    sceneState.rootEntity = entity
-                    content.add(entity)
-                    self.entity = entity
-                }
-            }
-
-            // ✅ Setup camera cho step hiện tại
-            if let step = appModel.steps[safe: appModel.currentStepIndex],
-               let cameraPos = step.cameraPos,
-               let cameraTarget = step.cameraTarget {
-
-                // Xóa camera cũ (nếu có)
-                content.entities
-                    .filter { $0 is PerspectiveCamera }
-                    .forEach { $0.removeFromParent() }
-
-                let cameraEntity = PerspectiveCamera()
-                cameraEntity.position = cameraPos
-                cameraEntity.look(at: cameraTarget, from: cameraPos, relativeTo: nil)
-                content.add(cameraEntity)
-            }
-
-            // ✅ Update animation khi state thay đổi
-            if appModel.isPlaying {
-                let nodes = appModel.steps[safe: appModel.currentStepIndex]?.nodes ?? []
-                playNodeAnimations(
-                    nodes: nodes,
-                    on: sceneState.rootEntity,
-                    stepIndex: appModel.currentStepIndex
-                )
-            }
-
-        }
-        .onChange(of: appModel.currentStepIndex) { _, _ in
-            guard appModel.isPlaying else { return }
-            let nodes = appModel.steps[safe: appModel.currentStepIndex]?.nodes ?? []
-            playNodeAnimations(
-                nodes: nodes,
-                on: sceneState.rootEntity,
-                stepIndex: appModel.currentStepIndex
-            )
-            
-            // 🧭 Cập nhật camera mỗi khi đổi step
-            if let step = appModel.steps[safe: appModel.currentStepIndex],
-               let cameraPos = step.cameraPos,
-               let cameraTarget = step.cameraTarget {
-                if let cam = sceneState.rootEntity.findEntity(named: "InstructionCamera") as? PerspectiveCamera {
-                    cam.position = cameraPos
-                    cam.look(at: cameraTarget, from: cameraPos, relativeTo: nil)
-                }
-            }
-        }
-        .onChange(of: appModel.isPlaying) { _, newValue in
-            let nodes = appModel.steps[safe: appModel.currentStepIndex]?.nodes ?? []
-            if newValue {
-                playNodeAnimations(
-                    nodes: nodes,
-                    on: sceneState.rootEntity,
-                    stepIndex: appModel.currentStepIndex
-                )
-            } else {
-                stopAllAnimations(entity: sceneState.rootEntity)
-            }
-        }
-    }
-    
-    func playNodeAnimations(nodes: [Node], on entity: Entity?, stepIndex: Int) {
-        guard let entity else { return }
-
-        var controllers: [AnimationPlaybackController] = []
-
-        func traverse(nodeList: [Node], parentEntity: Entity) {
-            for node in nodeList {
-                guard stepIndex < node.steps.count else { continue }
-                
-                let keyframes = node.steps[stepIndex].keyframes
-                guard keyframes.count > 1 else { continue }
-                print("\(node.name) keyframes-\(keyframes.count)")
-                guard let childEntity = parentEntity.findEntity(named: node.name) else { continue }
-                childEntity.isEnabled = keyframes.first?.visible ?? true
-
-                for i in 0 ..< keyframes.count - 1 {
-                    let firstMove = keyframes[i]
-                    let lastMove = keyframes[i + 1]
-
-                    let start = Transform(
-                        scale: SIMD3(
-                            Float(firstMove.scale.x),
-                            Float(firstMove.scale.y),
-                            Float(firstMove.scale.z)
-                        ),
-                        rotation: simd_quatf(
-                            ix: Float(firstMove.quaternion[0]),
-                            iy: Float(firstMove.quaternion[2]),
-                            iz: -Float(firstMove.quaternion[1]),
-                            r: Float(firstMove.quaternion[3])
-                        ),
-                        translation: SIMD3(
-                            -Float(firstMove.position.z),
-                            Float(firstMove.position.x),
-                            Float(firstMove.position.y)
+                    sceneState.rootEntity = loaded
+                    content.add(loaded)
+                    
+                    if let step = appModel.steps[safe: appModel.currentStepIndex] {
+                        applyInitialPoses(
+                            nodes: step.nodes,
+                            parentEntity: loaded,
+                            stepIndex: appModel.currentStepIndex
                         )
-                    )
 
-                    let end = Transform(
-                        scale: SIMD3(
-                            Float(lastMove.scale.x),
-                            Float(lastMove.scale.y),
-                            Float(lastMove.scale.z)
-                        ),
-                        rotation: simd_quatf(
-                            ix: Float(lastMove.quaternion[0]),
-                            iy: Float(lastMove.quaternion[2]),
-                            iz: -Float(lastMove.quaternion[1]),
-                            r: Float(lastMove.quaternion[3])
-                        ),
-                        translation: SIMD3(
-                            -Float(lastMove.position.z),
-                            Float(lastMove.position.x),
-                            Float(lastMove.position.y)
-                        )
-                    )
+//                        if let cameraPos = step.cameraPos,
+//                           let cameraTarget = step.cameraTarget {
+//                            let cameraEntity = PerspectiveCamera()
+//                            cameraEntity.position = cameraPos
+//                            cameraEntity.look(at: cameraTarget, from: cameraPos, relativeTo: nil)
+//                            content.add(cameraEntity)
+//                        }
 
-                    let anim = FromToByAnimation<Transform>(
-                        from: start,
-                        to: end,
-                        duration: 1.5,
-                        bindTarget: .transform
-                    )
-
-                    if let resource = try? AnimationResource.generate(with: anim) {
-                        // 🚀 tạo controller nhưng tạm dừng ngay
-                        let controller = childEntity.playAnimation(resource, transitionDuration: 0, startsPaused: true)
-                        controllers.append(controller)
+                        if appModel.isPlaying {
+                            startTimeline(
+                                nodes: step.nodes,
+                                on: loaded,
+                                stepIndex: appModel.currentStepIndex
+                            )
+                        }
                     }
                 }
-                
-                if !node.children.isEmpty {
-                    traverse(nodeList: node.children, parentEntity: parentEntity)
+            }
+
+//            if let step = appModel.steps[safe: appModel.currentStepIndex],
+//               let cameraPos = step.cameraPos,
+//               let cameraTarget = step.cameraTarget {
+//
+//                content.entities
+//                    .filter { $0 is PerspectiveCamera }
+//                    .forEach { $0.removeFromParent() }
+//
+//                let cameraEntity = PerspectiveCamera()
+//                cameraEntity.position = cameraPos
+//                cameraEntity.look(at: cameraTarget, from: cameraPos, relativeTo: nil)
+//                content.add(cameraEntity)
+//            }
+        }
+        .onChange(of: appModel.currentStepIndex) { _, newIndex in
+            guard appModel.isPlaying else { return }
+            let root = sceneState.rootEntity
+            stopTimeline()
+            startTimeline(nodes: appModel.steps[safe: newIndex]?.nodes ?? [], on: root, stepIndex: newIndex)
+            // update camera
+//            if let step = appModel.steps[safe: newIndex],
+//               let cameraPos = step.cameraPos,
+//               let cameraTarget = step.cameraTarget,
+//               let cam = sceneState.rootEntity.findEntity(named: "InstructionCamera") as? PerspectiveCamera {
+//                cam.position = cameraPos
+//                cam.look(at: cameraTarget, from: cameraPos, relativeTo: nil)
+//            }
+        }
+        .onChange(of: appModel.isPlaying) { _, newValue in
+            let root = sceneState.rootEntity
+            let nodes = appModel.steps[safe: appModel.currentStepIndex]?.nodes ?? []
+
+            if newValue {
+                if isAnimating {
+                    return
+                } else if startTime > 0 {
+                    print("resume nè \(startTime)")
+                    resumeTimeline(nodes: nodes, on: root, stepIndex: appModel.currentStepIndex)
+                } else {
+                    print("start lại nè \(startTime)")
+                    startTimeline(nodes: nodes, on: root, stepIndex: appModel.currentStepIndex)
                 }
+            } else {
+                print("pasue nè \(startTime)")
+                pauseTimeline()
             }
         }
 
-        traverse(nodeList: nodes, parentEntity: entity)
+        .onDisappear {
+            stopTimeline()
+        }
+    }
 
-        // 🎬 Sau khi đã setup hết → resume đồng thời tất cả
-        controllers.forEach { $0.resume() }
+    func startTimeline(nodes: [Node], on entity: Entity, stepIndex: Int) {
+        guard entity.scene != nil else {
+            return
+        }
+
+        stopTimeline()
+        
+        applyInitialPoses(nodes: nodes, parentEntity: entity, stepIndex: stepIndex)
+
+        startTime = 0
+        isAnimating = true
+
+        frameDuration = 1.0
+        
+        // Subscribe to SceneEvents.Update
+        if let scene = entity.scene {
+            updateCancellable = scene.subscribe(to: SceneEvents.Update.self) { event in
+                guard isAnimating else { return }
+                startTime += event.deltaTime
+                
+                let keyframeCount = nodes.first?.steps[safe: stepIndex]?.keyframes.count ?? 1
+                let totalSegments = max(1, keyframeCount - 1)
+                
+                let totalDuration = frameDuration * Double(totalSegments)
+
+                if totalDuration <= 0 { return }
+
+                let elapsedInStep = min(startTime, totalDuration)
+                let progress = Float(elapsedInStep / totalDuration)
+
+                updateNodes(nodes: nodes, parentEntity: entity, stepIndex: stepIndex, progress: progress)
+                if elapsedInStep >= totalDuration {
+                    isAnimating = false
+                    applyFinalPoses(nodes: nodes, parentEntity: entity, stepIndex: stepIndex)
+                    startTime = 0
+                    Task { @MainActor in
+                        appModel.isPlaying = false
+                    }
+                }
+            }
+        }
+    }
+
+    func stopTimeline() {
+        isAnimating = false
+        startTime = 0
+        updateCancellable?.cancel()
+        updateCancellable = nil
+    }
+    
+    func pauseTimeline() {
+        guard isAnimating else { return }
+        isAnimating = false
+        updateCancellable?.cancel()
+        updateCancellable = nil
+    }
+
+    func resumeTimeline(nodes: [Node], on entity: Entity, stepIndex: Int) {
+        guard entity.scene != nil else { return }
+        guard !isAnimating else { return }
+
+        isAnimating = true
+
+        if let scene = entity.scene {
+            updateCancellable = scene.subscribe(to: SceneEvents.Update.self) { event in
+                guard isAnimating else { return }
+                startTime += event.deltaTime
+                
+                let keyframeCount = nodes.first?.steps[safe: stepIndex]?.keyframes.count ?? 1
+                let totalSegments = max(1, keyframeCount - 1)
+                let totalDuration = frameDuration * Double(totalSegments)
+                if totalDuration <= 0 { return }
+
+                let elapsedInStep = min(startTime, totalDuration)
+                let progress = Float(elapsedInStep / totalDuration)
+
+                updateNodes(nodes: nodes, parentEntity: entity, stepIndex: stepIndex, progress: progress)
+
+                if elapsedInStep >= totalDuration {
+                    isAnimating = false
+                    startTime = 0
+                    applyFinalPoses(nodes: nodes, parentEntity: entity, stepIndex: stepIndex)
+                    Task { @MainActor in appModel.isPlaying = false }
+                }
+            }
+        }
     }
 
 
+    private func applyInitialPoses(nodes: [Node], parentEntity: Entity, stepIndex: Int) {
+        for node in nodes {
+            guard stepIndex < node.steps.count,
+                  let childEntity = parentEntity.findEntity(named: node.name) else {
+                    if !node.children.isEmpty {
+                        applyInitialPoses(nodes: node.children, parentEntity: parentEntity, stepIndex: stepIndex)
+                    }
+                    continue
+            }
 
+            let keyframes = node.steps[stepIndex].keyframes
+            guard let first = keyframes.first else { continue }
 
+            childEntity.isEnabled = first.visible
+            childEntity.transform = convertKeyframeToTransform(first)
+            if !node.children.isEmpty {
+                applyInitialPoses(nodes: node.children, parentEntity: parentEntity, stepIndex: stepIndex)
+            }
+        }
+    }
 
-    func stopAllAnimations(entity: Entity?) {
-        entity?.stopAllAnimations()
+    private func applyFinalPoses(nodes: [Node], parentEntity: Entity, stepIndex: Int) {
+        for node in nodes {
+            guard stepIndex < node.steps.count,
+                  let childEntity = parentEntity.findEntity(named: node.name) else {
+                if !node.children.isEmpty {
+                    applyFinalPoses(nodes: node.children, parentEntity: parentEntity, stepIndex: stepIndex)
+                }
+                continue
+            }
+            let keyframes = node.steps[stepIndex].keyframes
+            if let last = keyframes.last {
+                childEntity.transform = convertKeyframeToTransform(last)
+            }
+            if !node.children.isEmpty {
+                applyFinalPoses(nodes: node.children, parentEntity: parentEntity, stepIndex: stepIndex)
+            }
+        }
+    }
+
+    private func updateNodes(nodes: [Node], parentEntity: Entity, stepIndex: Int, progress: Float) {
+        for node in nodes {
+            guard stepIndex < node.steps.count,
+                  let childEntity = parentEntity.findEntity(named: node.name) else {
+                if !node.children.isEmpty {
+                    updateNodes(nodes: node.children, parentEntity: parentEntity, stepIndex: stepIndex, progress: progress)
+                }
+                continue
+            }
+
+            let keyframes = node.steps[stepIndex].keyframes
+            guard keyframes.count > 1 else {
+                if let only = keyframes.first {
+                    childEntity.transform = convertKeyframeToTransform(only)
+                }
+                if !node.children.isEmpty {
+                    updateNodes(nodes: node.children, parentEntity: parentEntity, stepIndex: stepIndex, progress: progress)
+                }
+                continue
+            }
+
+            let totalSegments = keyframes.count - 1
+            
+            let scaled = progress * Float(totalSegments)
+            var segmentIndex = Int(floor(scaled))
+            if segmentIndex < 0 { segmentIndex = 0 }
+            if segmentIndex >= totalSegments { segmentIndex = totalSegments - 1 }
+
+            let localT = (scaled - Float(segmentIndex)).clamped(to: 0...1)
+
+            let startKF = keyframes[segmentIndex]
+            let endKF = keyframes[segmentIndex + 1]
+
+            let interpolated = interpolateTransform(from: startKF, to: endKF, t: localT)
+            childEntity.transform = interpolated
+
+            if !node.children.isEmpty {
+                updateNodes(nodes: node.children, parentEntity: parentEntity, stepIndex: stepIndex, progress: progress)
+            }
+        }
+    }
+
+    private func convertKeyframeToTransform(_ kf: PurpleKeyframe) -> Transform {
+
+        let translation = SIMD3<Float>(
+            -Float(kf.position.z),
+            Float(kf.position.x),
+            Float(kf.position.y)
+        )
+
+        let scale = SIMD3<Float>(
+            Float(kf.scale.x),
+            Float(kf.scale.y),
+            Float(kf.scale.z)
+        )
+
+        let rotation = simd_quatf(
+            ix: Float(kf.quaternion[0]),
+            iy: Float(kf.quaternion[2]),
+            iz: -Float(kf.quaternion[1]),
+            r: Float(kf.quaternion[3])
+        )
+
+        return Transform(scale: scale, rotation: rotation, translation: translation)
+    }
+
+    private func interpolateTransform(from: PurpleKeyframe, to: PurpleKeyframe, t: Float) -> Transform {
+
+        let px0 = -Float(from.position.z); let px1 = -Float(to.position.z)
+        let py0 = Float(from.position.x);  let py1 = Float(to.position.x)
+        let pz0 = Float(from.position.y);  let pz1 = Float(to.position.y)
+
+        let pos = SIMD3<Float>(lerp(px0, px1, t), lerp(py0, py1, t), lerp(pz0, pz1, t))
+
+        let sx = lerp(Float(from.scale.x), Float(to.scale.x), t)
+        let sy = lerp(Float(from.scale.y), Float(to.scale.y), t)
+        let sz = lerp(Float(from.scale.z), Float(to.scale.z), t)
+        let scale = SIMD3<Float>(sx, sy, sz)
+
+        let rotFrom = simd_quatf(
+            ix: Float(from.quaternion[0]),
+            iy: Float(from.quaternion[2]),
+            iz: -Float(from.quaternion[1]),
+            r: Float(from.quaternion[3])
+        )
+        let rotTo = simd_quatf(
+            ix: Float(to.quaternion[0]),
+            iy: Float(to.quaternion[2]),
+            iz: -Float(to.quaternion[1]),
+            r: Float(to.quaternion[3])
+        )
+
+        let rotation = simd_slerp(rotFrom, rotTo, t)
+
+        return Transform(scale: scale, rotation: rotation, translation: pos)
+    }
+
+    private func lerp(_ a: Float, _ b: Float, _ t: Float) -> Float {
+        return a + (b - a) * t
     }
 }
 
+extension Float {
+    func clamped(to range: ClosedRange<Float>) -> Float {
+        min(max(self, range.lowerBound), range.upperBound)
+    }
+}
 
 struct Model3DInstructionStep {
     let title: String

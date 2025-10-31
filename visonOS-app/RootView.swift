@@ -1,7 +1,9 @@
 import SwiftUI
+import RealityKit
 
 struct RootView: View {
     @Environment(AppModel.self) private var appModel
+    @Environment(SceneState.self) private var sceneState
 
     var body: some View {
         Group {
@@ -16,6 +18,9 @@ struct RootView: View {
                     InstructionView()
                     .onDisappear{
                         appModel.resetInstructionState()
+                        sceneState.rootEntity.removeFromParent()
+                        sceneState.rootEntity = Entity()
+                        sceneState.project = nil
                     }
             }
         }

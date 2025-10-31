@@ -1,4 +1,5 @@
 import SwiftUI
+import RealityKit
 
 @Observable
 @MainActor
@@ -130,5 +131,11 @@ class AppModel {
         self.currentStepIndex = 0
         self.isPlaying = false
     }
-    
+}
+
+@Observable
+class SceneState {
+    var rootEntity = Entity()
+    var project: AnimationModel?
+    var currentMode: ViewerMode = .plain
 }
