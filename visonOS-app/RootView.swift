@@ -1,7 +1,9 @@
 import SwiftUI
+import RealityKit
 
 struct RootView: View {
     @Environment(AppModel.self) private var appModel
+    @Environment(SceneState.self) private var sceneState
 
     var body: some View {
         Group {
@@ -14,22 +16,18 @@ struct RootView: View {
                     ProjectDetailView()
                 case .instruction:
                     InstructionView()
+                    .onDisappear{
+                        appModel.resetInstructionState()
+                        sceneState.rootEntity.removeFromParent()
+                        sceneState.rootEntity = Entity()
+                        sceneState.project = nil
+                    }
             }
         }
         .environment(appModel)
         .animation(.easeInOut, value: appModel.currentScreen)
         .transition(.opacity)
     }
-//    @Environment(\.openWindow) private var openWindow
-//        
-//        var body: some View {
-//            VStack {
-//                Text("Main Menu")
-//                Button("Open 3D Viewer") {
-//                    openWindow(id: VisionOSApp.viewModel3D)
-//                }
-//            }
-//        }
 }
 
 #Preview {

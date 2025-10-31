@@ -68,7 +68,7 @@ struct LoginView: View {
                                 .textContentType(.password)
                                 .foregroundColor(.white)
                                 .font(.body)
-                                .padding(.vertical, 6) // 👈 thấp hơn
+                                .padding(.vertical, 6)
                         } else {
                             SecureField("", text: $password)
                                 .textContentType(.password)
@@ -83,9 +83,9 @@ struct LoginView: View {
                             Image(systemName: isPasswordVisible ? "eye" : "eye.slash")
                                 .resizable()
                                 .scaledToFit()
-                                .frame(width: 14, height: 14) // 👈 nhỏ hơn
+                                .frame(width: 14, height: 14)
                                 .foregroundColor(.gray.opacity(0.8))
-                                .padding(.bottom, 1) // 👈 hạ thấp icon chút
+                                .padding(.bottom, 1)
                         }
                         .buttonStyle(.plain)
                         .padding(.trailing, 6)

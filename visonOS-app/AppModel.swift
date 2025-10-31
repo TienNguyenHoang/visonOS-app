@@ -1,4 +1,5 @@
 import SwiftUI
+import RealityKit
 
 @Observable
 @MainActor
@@ -18,8 +19,14 @@ class AppModel {
     }
     
     var currentScreen: Screen = .login
+    
+    // Instruction
     var isVolumeShown: Bool = false
-
+    var currentStepIndex: Int = 0
+    var isPlaying: Bool = false
+    var modelName: String? = "test5.usdz"
+    var steps: [Model3DInstructionStep] = []
+    
     // Data
     var projects: [Project] = []
     var selectedProject: Project? = nil
@@ -120,4 +127,15 @@ class AppModel {
         self.currentScreen = .instruction
     }
     
+    func resetInstructionState() {
+        self.currentStepIndex = 0
+        self.isPlaying = false
+    }
+}
+
+@Observable
+class SceneState {
+    var rootEntity = Entity()
+    var project: AnimationModel?
+    var currentMode: ViewerMode = .plain
 }

@@ -8,7 +8,6 @@ struct AnimationModel: Codable {
     let env: Env
 }
 
-// MARK: - Env
 struct Env: Codable {
     let version: Int
     let zenithColor: [Int]
@@ -42,34 +41,28 @@ struct PurpleKeyframe: Codable {
     let visible: Bool
 }
 
-// MARK: - CameraPos
 struct CameraPos: Codable {
     let x, y, z: Double
 }
 
-// MARK: - WelcomeStep
 struct AnimInstructionStep: Codable {
     let keyframes: [FluffyKeyframe]
     let descriptionText: DescriptionText
     let descriptionSpeech: DescriptionSpeech
 }
 
-// MARK: - DescriptionSpeech
 struct DescriptionSpeech: Codable {
     let mediaUrls, mediaNames: MediaNames
 }
 
-// MARK: - MediaNames
 struct MediaNames: Codable {
     let en, fr: String
 }
 
-// MARK: - DescriptionText
 struct DescriptionText: Codable {
     let text: MediaNames
 }
 
-// MARK: - FluffyKeyframe
 struct FluffyKeyframe: Codable {
     let cameraPos, cameraTarget: CameraPos
 }
